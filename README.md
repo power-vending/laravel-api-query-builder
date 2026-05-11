@@ -2258,6 +2258,62 @@ public function index(Request $request)
 
 Quando uma requisição contém parâmetros inválidos, o pacote lança exceções que podem ser mapeadas para respostas HTTP 400. Esta seção descreve cada mensagem de erro, sua causa e como corrigi-la.
 
+---
+
+### `Relation '<RELATION>' does not exist on model '<MODEL_CLASS>'.`
+
+**Exceção:** `InvalidRelationException`
+
+**Causa:** Foi informado um relacionamento que não existe no model (ou em algum nível de relacionamento aninhado).
+
+**Situações em que pode ocorrer:**
+
+1. No parâmetro `relations`.
+2. No parâmetro `search` quando a chave representa relacionamento (ex.: sub-search em objeto ou notação com ponto como `relation.column`).
+3. No parâmetro `doesnt_have_relations`.
+
+**Exemplos que causam o erro:**
+
+```json
+{
+    "relations": ["unknown_relation"]
+}
+```
+
+```json
+{
+    "search": {
+        "unknown_relation": {
+            "search": {
+                "id": "EQ:1"
+            }
+        }
+    }
+}
+```
+
+```json
+{
+    "search": {
+        "unknown_relation.description": "EQ:abc"
+    }
+}
+```
+
+```json
+{
+    "doesnt_have_relations": ["unknown_relation"]
+}
+```
+
+**Solução:**
+
+1. Verifique o nome da relação no model Eloquent e use o nome correto.
+2. Em relações aninhadas, valide cada segmento do caminho (ex.: `orders.items.product`).
+3. Se necessário, padronize o nome enviado pelo frontend para o método real da relação no backend.
+
+---
+
 Os erros abaixo são produzidos pela classe `InvalidOperatorUsageException` e **a mensagem é segura para ser exibida diretamente ao consumidor da API**.
 
 ---
