@@ -5,7 +5,6 @@ declare(strict_types = 1);
 namespace PowerVending\LaravelApiQueryBuilder\RequestParameters;
 
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Str;
 use PowerVending\LaravelApiQueryBuilder\{ApiQuery, CustomFieldSearchParser, SearchParser, SearchParserInterface};
 use PowerVending\LaravelApiQueryBuilder\Config\OperatorsConfig;
 use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
@@ -81,7 +80,9 @@ class SearchParameter extends AbstractParameter
 
             if ($this->hasSubSearch($key, $value)) {
                 // If query has sub-search, it is a relation for sure.
-                $builder->whereHas(Str::camel($key), function ($query) use ($value) {
+                $normalizedRelation = $this->assertRelationExists($key);
+
+                $builder->whereHas($normalizedRelation, function ($query) use ($value) {
                     $jsonQuery = new ApiQuery($query, $value);
                     $jsonQuery->search();
                 });

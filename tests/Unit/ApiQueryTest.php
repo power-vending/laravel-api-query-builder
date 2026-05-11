@@ -8,6 +8,7 @@ use Exception;
 use Illuminate\Database\Eloquent\Builder;
 use PowerVending\LaravelApiQueryBuilder\ApiQuery;
 use PowerVending\LaravelApiQueryBuilder\Config\ModelConfig;
+use PowerVending\LaravelApiQueryBuilder\Exceptions\InvalidRelationException;
 use PowerVending\LaravelApiQueryBuilder\Tests\{TestCase, TestModel};
 
 class ApiQueryTest extends TestCase
@@ -341,6 +342,40 @@ class ApiQueryTest extends TestCase
         $sql = 'select * from "test" where ((((("test"."id" in (?)) or ("test"."id" in (?))) and (("name" in (?)))) or ((("test"."id" in (?))) and (("name" LIKE ? and "name" LIKE ?)))) and ((("we" in (?)))) or (("love" < ?)) or (("recursion" in (?))))';
 
         $this->assertEquals($sql, $this->builder->toSql());
+    }
+
+    /** @test */
+    public function throws_on_invalid_relation_in_search_filter()
+    {
+        $this->expectException(InvalidRelationException::class);
+
+        $input = [
+            'search' => [
+                'unknown_relation' => [
+                    'search' => [
+                        'id' => 'EQ:1',
+                    ],
+                ],
+            ],
+        ];
+
+        $jsonQuery = new ApiQuery($this->builder, $input);
+        $jsonQuery->search();
+    }
+
+    /** @test */
+    public function throws_on_invalid_relation_in_doesnt_have_relations()
+    {
+        $this->expectException(InvalidRelationException::class);
+
+        $input = [
+            'doesnt_have_relations' => [
+                'unknown_relation',
+            ],
+        ];
+
+        $jsonQuery = new ApiQuery($this->builder, $input);
+        $jsonQuery->search();
     }
 
     /** @test */

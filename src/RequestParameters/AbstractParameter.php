@@ -5,8 +5,12 @@ declare(strict_types = 1);
 namespace PowerVending\LaravelApiQueryBuilder\RequestParameters;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Str;
 use PowerVending\LaravelApiQueryBuilder\Config\ModelConfig;
 use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
+use PowerVending\LaravelApiQueryBuilder\Exceptions\InvalidRelationException;
 
 abstract class AbstractParameter
 {
@@ -65,5 +69,54 @@ abstract class AbstractParameter
         }
 
         // Override or extend on child objects if needed
+    }
+
+    /**
+     * Validate relation path and return normalized (camel-cased) dot notation.
+     *
+     * @throws InvalidRelationException
+     */
+    protected function assertRelationExists(string $relationPath): string
+    {
+        $segments = array_values(array_filter(explode('.', $relationPath), fn (string $segment) => trim($segment) !== ''));
+
+        if ($segments === []) {
+            throw new InvalidRelationException("Relation '$relationPath' does not exist on model '" . get_class($this->builder->getModel()) . "'.");
+        }
+
+        $currentModel = $this->builder->getModel();
+        $normalizedSegments = [];
+
+        foreach ($segments as $segment) {
+            $method = Str::camel($segment);
+
+            $relation = $this->resolveRelation($currentModel, $method);
+
+            if ($relation === null) {
+                throw new InvalidRelationException(
+                    "Relation '$method' does not exist on model '" . get_class($currentModel) . "'."
+                );
+            }
+
+            $normalizedSegments[] = $method;
+            $currentModel = $relation->getRelated();
+        }
+
+        return implode('.', $normalizedSegments);
+    }
+
+    protected function resolveRelation(Model $model, string $method): ?Relation
+    {
+        if (!method_exists($model, $method)) {
+            return null;
+        }
+
+        try {
+            $relation = $model->{$method}();
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $relation instanceof Relation ? $relation : null;
     }
 }
