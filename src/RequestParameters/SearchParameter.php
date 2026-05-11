@@ -89,6 +89,11 @@ class SearchParameter extends AbstractParameter
                 continue;
             }
 
+            if ($this->isRelationColumnSearch($key, $value)) {
+                [$relationPath] = $this->extractRelationAndColumn($key);
+                $this->assertRelationExists($relationPath);
+            }
+
             $this->makeSingleQuery($functionName, $builder, $key, $value);
         }
     }
@@ -130,6 +135,31 @@ class SearchParameter extends AbstractParameter
     protected function hasSubSearch($key, $value): bool
     {
         return is_string($key) && is_array($value);
+    }
+
+    protected function isRelationColumnSearch($key, $value): bool
+    {
+        return is_string($key)
+            && is_string($value)
+            && str_contains($key, '.');
+    }
+
+    /**
+     * @return array{string, string}
+     *
+     * @throws ApiQueryBuilderException
+     */
+    protected function extractRelationAndColumn(string $key): array
+    {
+        $parts = explode('.', $key);
+        $column = array_pop($parts);
+        $relationPath = implode('.', $parts);
+
+        if ($relationPath === '' || $column === '') {
+            throw new ApiQueryBuilderException("Invalid relation column search key '$key'.");
+        }
+
+        return [$relationPath, $column];
     }
 
     /**

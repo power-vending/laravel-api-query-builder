@@ -364,6 +364,39 @@ class ApiQueryTest extends TestCase
     }
 
     /** @test */
+    public function throws_on_invalid_relation_in_dot_notation_search_filter()
+    {
+        $this->expectException(InvalidRelationException::class);
+
+        $input = [
+            'search' => [
+                'aaa.description' => 'EQ:sed',
+            ],
+        ];
+
+        $jsonQuery = new ApiQuery($this->builder, $input);
+        $jsonQuery->search();
+    }
+
+    /** @test */
+    public function can_search_by_relation_column_using_dot_notation()
+    {
+        $input = [
+            'search' => [
+                'related.description' => 'EQ:sed',
+            ],
+        ];
+
+        $jsonQuery = new ApiQuery($this->builder, $input);
+        $jsonQuery->search();
+
+        $sql = $this->builder->toSql();
+
+        $this->assertStringContainsString('exists (select * from "related"', $sql);
+        $this->assertStringContainsString('"description" in (?)', $sql);
+    }
+
+    /** @test */
     public function throws_on_invalid_relation_in_doesnt_have_relations()
     {
         $this->expectException(InvalidRelationException::class);
