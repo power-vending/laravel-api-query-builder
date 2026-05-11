@@ -1,0 +1,52 @@
+<?php
+
+declare(strict_types = 1);
+
+namespace PowerVending\LaravelApiQueryBuilder\Config;
+
+use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
+use PowerVending\LaravelApiQueryBuilder\SearchCallbacks\AbstractCallback;
+
+class OperatorsConfig extends SearchConfig
+{
+    protected function configKey(): string
+    {
+        return 'operators';
+    }
+
+    protected function operatorCallbackMapping(): array
+    {
+        $operators = $this->getOperators();
+        $callbacks = $this->registered;
+
+        return array_combine($operators, $callbacks);
+    }
+
+    /**
+     * Extract operators from registered 'operator' classes.
+     *
+     * @return array
+     */
+    public function getOperators(): array
+    {
+        /**
+         * @var AbstractCallback $callback
+         */
+        return array_map(fn ($callback) => $callback::operator(), $this->registered);
+    }
+
+    /**
+     * @param  string  $operator
+     * @return string
+     *
+     * @throws ApiQueryBuilderException
+     */
+    public function getCallbackClassFromOperator(string $operator): string
+    {
+        if (!array_key_exists($operator, $this->operatorCallbackMapping())) {
+            throw new ApiQueryBuilderException("No valid callback registered for '$operator' operator.");
+        }
+
+        return $this->operatorCallbackMapping()[$operator];
+    }
+}
