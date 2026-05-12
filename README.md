@@ -415,7 +415,7 @@ public function requesterOperator(): BelongsTo
 Com isso, ao solicitar o schema, você pode referenciar cada variação diretamente:
 
 ```http
-GET /api-query-builder/tickets/schema?relations[]=requester_user&relations[]=requesterOperator
+GET /api-query-builder/tickets/schema?relations[]=requester_user&relations[]=requester_operator
 ```
 
 E o retorno trará os campos de cada modelo destino de forma independente:
