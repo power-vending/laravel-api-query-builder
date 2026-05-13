@@ -383,6 +383,62 @@ Exemplo resumido de resposta:
 }
 ```
 
+### Relacionamentos polimórficos
+
+Relacionamentos polimórficos criados com `morphTo()` não definem um modelo de destino fixo, o que impede o schema de resolver corretamente os campos e relacionamentos do lado polimórfico.
+
+```php
+// Exemplo típico — o schema NÃO consegue introspeccionar o modelo de destino
+public function requester(): MorphTo
+{
+    return $this->morphTo();
+}
+```
+
+Para que o schema consiga carregar os metadados corretamente, é recomendado (opcional) criar relacionamentos auxiliares tipados com `belongsTo`, um por cada modelo de destino possível. Cada relacionamento deve filtrar pelo campo `*_type` correspondente:
+
+```php
+// Relacionamentos auxiliares tipados — o schema resolve cada modelo corretamente
+public function requesterUser(): BelongsTo
+{
+    return $this->belongsTo(User::class, 'requester_id')
+        ->where('requester_type', User::class);
+}
+
+public function requesterOperator(): BelongsTo
+{
+    return $this->belongsTo(Operator::class, 'requester_id')
+        ->where('requester_type', Operator::class);
+}
+```
+
+Com isso, ao solicitar o schema, você pode referenciar cada variação diretamente:
+
+```http
+GET /api-query-builder/tickets/schema?relations[]=requester_user&relations[]=requester_operator
+```
+
+E o retorno trará os campos de cada modelo destino de forma independente:
+
+```json
+{
+    "relations": {
+        "requester_user": {
+            "model": "App\\Models\\User",
+            "table": "users",
+            "relations": {}
+        },
+        "requester_operator": {
+            "model": "App\\Models\\Operator",
+            "table": "operators",
+            "relations": {}
+        }
+    }
+}
+```
+
+> **Nota:** O relacionamento `morphTo()` original pode ser mantido no model normalmente — os relacionamentos auxiliares são apenas para uso com o schema e não interferem no comportamento padrão do Eloquent.
+
 ---
 
 ## Operadores de busca
