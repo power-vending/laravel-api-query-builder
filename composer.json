@@ -1,5 +1,5 @@
 {
-    "name": "powervending/laravel-api-query-builder",
+    "name": "power-vending/laravel-api-query-builder",
     "description": "Laravel API query builder - forked and customized from nealarec/laravel-json-query-builder",
     "keywords": [
         "php",
@@ -14,7 +14,7 @@
     "authors": [
         {
             "name": "Power Vending",
-            "email": "dev@powervending.com"
+            "email": "web@powervending.com.br"
         }
     ],
     "require": {
