@@ -44,12 +44,14 @@ class SchemaControllerTest extends TestCase
                 'nested' => [['name' => 'id', 'type' => 'int', 'nullable' => false]],
                 'companies' => [['name' => 'id', 'type' => 'int', 'nullable' => false]],
                 'company_addresses' => [['name' => 'id', 'type' => 'int', 'nullable' => false]],
+                'users' => [['name' => 'id', 'type' => 'int', 'nullable' => false]],
+                'user_profiles' => [['name' => 'id', 'type' => 'int', 'nullable' => false]],
                 default => [],
             };
         });
 
         $controller = new SchemaController();
-        $request = SchemaRequest::create('/schema', 'GET', ['relations' => ['company']]);
+        $request = SchemaRequest::create('/schema', 'GET', ['relations' => ['company.users']]);
 
         $response = $controller->show($request, 'tests');
         $payload = $response->getData(true);
@@ -57,6 +59,9 @@ class SchemaControllerTest extends TestCase
         $this->assertArrayHasKey('related', $payload['relations']);
         $this->assertArrayHasKey('company', $payload['relations']);
         $this->assertArrayHasKey('tags', $payload['relations']);
+        $this->assertArrayHasKey('address', $payload['relations']['company']['relations']);
+        $this->assertArrayHasKey('users', $payload['relations']['company']['relations']);
+        $this->assertArrayHasKey('profile', $payload['relations']['company']['relations']['users']['relations']);
     }
 
     /** @test */

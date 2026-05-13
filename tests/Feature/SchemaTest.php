@@ -32,6 +32,8 @@ class SchemaTest extends TestCase
         ]]);
 
         Schema::dropIfExists('company_addresses');
+        Schema::dropIfExists('user_profiles');
+        Schema::dropIfExists('users');
         Schema::dropIfExists('companies');
         Schema::dropIfExists('nested');
         Schema::dropIfExists('related');
@@ -45,6 +47,18 @@ class SchemaTest extends TestCase
         Schema::create('companies', function (Blueprint $table) {
             $table->increments('id');
             $table->unsignedInteger('address_id')->nullable();
+            $table->string('name')->nullable();
+        });
+
+        Schema::create('user_profiles', function (Blueprint $table) {
+            $table->increments('id');
+            $table->string('name')->nullable();
+        });
+
+        Schema::create('users', function (Blueprint $table) {
+            $table->increments('id');
+            $table->unsignedInteger('company_id')->nullable();
+            $table->unsignedInteger('profile_id')->nullable();
             $table->string('name')->nullable();
         });
 
@@ -75,6 +89,8 @@ class SchemaTest extends TestCase
         Schema::dropIfExists('test');
         Schema::dropIfExists('related');
         Schema::dropIfExists('nested');
+        Schema::dropIfExists('users');
+        Schema::dropIfExists('user_profiles');
         Schema::dropIfExists('companies');
         Schema::dropIfExists('company_addresses');
 
@@ -162,6 +178,35 @@ class SchemaTest extends TestCase
         $this->assertArrayHasKey('related', $payload['relations']);
         $this->assertArrayHasKey('tags', $payload['relations']);
         $this->assertArrayHasKey('company', $payload['relations']);
+    }
+
+    /** @test */
+    public function expands_requested_relation_with_all_auto_discovered_descendants()
+    {
+        $response = $this->getJson('/api-query-builder/tests/schema?relations[]=company');
+        $response->assertOk();
+
+        $payload = $response->json();
+        $this->assertIsArray($payload);
+
+        $this->assertArrayHasKey('company', $payload['relations']);
+        $this->assertArrayHasKey('address', $payload['relations']['company']['relations']);
+        $this->assertArrayHasKey('users', $payload['relations']['company']['relations']);
+    }
+
+    /** @test */
+    public function expands_only_first_level_for_each_node_in_requested_path()
+    {
+        $response = $this->getJson('/api-query-builder/tests/schema?relations[]=company.users');
+        $response->assertOk();
+
+        $payload = $response->json();
+        $this->assertIsArray($payload);
+
+        $this->assertArrayHasKey('company', $payload['relations']);
+        $this->assertArrayHasKey('address', $payload['relations']['company']['relations']);
+        $this->assertArrayHasKey('users', $payload['relations']['company']['relations']);
+        $this->assertArrayHasKey('profile', $payload['relations']['company']['relations']['users']['relations']);
     }
 
     /** @test */

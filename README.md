@@ -351,12 +351,14 @@ Comportamento de `relations`:
 
 1. Sem `relations`: **auto-descobre e carrega automaticamente todas as relações públicas do modelo**
 2. `relations[]` informado: adiciona essas relações ao resultado (mescla com as auto-descobertas)
-3. Relação inexistente: lança erro de validação de relação (tratável pelo Handler da aplicação)
+3. Para cada caminho enviado em `relations[]`, o schema carrega **somente o primeiro nível** de cada nó do caminho
+4. Relação inexistente: lança erro de validação de relação (tratável pelo Handler da aplicação)
 
 Exemplo:
 
 1. `GET /api-query-builder/terminals/schema` retorna **automaticamente** todas as relações públicas do model `Terminal`
-2. `GET /api-query-builder/terminals/schema?relations[]=company` retorna as relações auto-descobertas de `Terminal` + `company`
+2. `GET /api-query-builder/terminals/schema?relations[]=company` retorna as relações de primeiro nível de `Terminal` + primeiro nível de `company` (ex.: `company.address`, `company.users`)
+3. `GET /api-query-builder/terminals/schema?relations[]=company.users` retorna as relações de primeiro nível de `Terminal` + primeiro nível de `company` + primeiro nível de `company.users` (ex.: `company.users.profile`)
 
 Exemplo resumido de resposta:
 

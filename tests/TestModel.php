@@ -18,6 +18,21 @@ class CompanyAddressModel extends Model
     protected $table = 'company_addresses';
 }
 
+class UserProfileModel extends Model
+{
+    protected $table = 'user_profiles';
+}
+
+class UserModel extends Model
+{
+    protected $table = 'users';
+
+    public function profile()
+    {
+        return $this->belongsTo(UserProfileModel::class, 'profile_id', 'id');
+    }
+}
+
 class CompanyModel extends Model
 {
     protected $table = 'companies';
@@ -25,6 +40,11 @@ class CompanyModel extends Model
     public function address()
     {
         return $this->belongsTo(CompanyAddressModel::class, 'address_id', 'id');
+    }
+
+    public function users()
+    {
+        return $this->hasMany(UserModel::class, 'company_id', 'id');
     }
 }
 

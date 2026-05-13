@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Str;
+use PowerVending\LaravelApiQueryBuilder\Exceptions\InvalidRelationException;
 use PowerVending\LaravelApiQueryBuilder\Http\Requests\SchemaRequest;
 use PowerVending\LaravelApiQueryBuilder\Schema\QueryBuilderSchema;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -67,9 +68,68 @@ class SchemaController
 
         foreach ($this->normalizeRelationPaths($requested_relations) as $relation_path) {
             $relations[] = $relation_path;
+
+            foreach ($this->buildPathPrefixes($relation_path) as $prefix) {
+                $related_model = $this->resolveRelationPathModel($model, $prefix);
+
+                if ($related_model === null) {
+                    throw new InvalidRelationException(
+                        "Relation '$prefix' does not exist on model '" . get_class($model) . "'."
+                    );
+                }
+
+                foreach ($this->discoverModelRelations($related_model) as $child_relation) {
+                    $relations[] = $prefix . '.' . $child_relation;
+                }
+            }
         }
 
         return $this->normalizeRelationPaths($relations);
+    }
+
+    private function buildPathPrefixes(string $path): array
+    {
+        $segments = array_values(array_filter(explode('.', $path), fn (string $segment) => $segment !== ''));
+        $prefixes = [];
+
+        for ($i = 0; $i < count($segments); $i++) {
+            $prefixes[] = implode('.', array_slice($segments, 0, $i + 1));
+        }
+
+        return $prefixes;
+    }
+
+    private function resolveRelationPathModel(Model $model, string $path): ?Model
+    {
+        $segments = array_values(array_filter(explode('.', $path), fn (string $segment) => $segment !== ''));
+
+        if ($segments === []) {
+            return null;
+        }
+
+        $current_model = $model;
+
+        foreach ($segments as $segment) {
+            $method = Str::camel($segment);
+
+            if (!method_exists($current_model, $method)) {
+                return null;
+            }
+
+            try {
+                $relation = $current_model->{$method}();
+            } catch (\Throwable) {
+                return null;
+            }
+
+            if (!$relation instanceof Relation) {
+                return null;
+            }
+
+            $current_model = $relation->getRelated();
+        }
+
+        return $current_model;
     }
 
     private function normalizeRelationPaths(array $relations): array
