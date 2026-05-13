@@ -1,28 +1,26 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\RequestParameters;
+namespace PowerVending\LaravelApiQueryBuilder\RequestParameters;
 
-use Asseco\JsonQueryBuilder\Config\OperatorsConfig;
-use Asseco\JsonQueryBuilder\CustomFieldSearchParser;
-use Asseco\JsonQueryBuilder\Exceptions\JsonQueryBuilderException;
-use Asseco\JsonQueryBuilder\JsonQuery;
-use Asseco\JsonQueryBuilder\SearchCallbacks\AbstractCallback;
-use Asseco\JsonQueryBuilder\SearchParser;
-use Asseco\JsonQueryBuilder\SearchParserInterface;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Str;
+use PowerVending\LaravelApiQueryBuilder\{ApiQuery, CustomFieldSearchParser, SearchParser, SearchParserInterface};
+use PowerVending\LaravelApiQueryBuilder\Config\OperatorsConfig;
+use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
+use PowerVending\LaravelApiQueryBuilder\SearchCallbacks\AbstractCallback;
 
 class SearchParameter extends AbstractParameter
 {
-    const OR = '||';
-    const AND = '&&';
+    public const OR = '||';
 
-    const AND_INCLUSIVE_CF = '&&_INC_CF';
+    public const AND = '&&';
 
-    const LARAVEL_WHERE = 'where';
-    const LARAVEL_OR_WHERE = 'orWhere';
+    public const AND_INCLUSIVE_CF = '&&_INC_CF';
+
+    public const LARAVEL_WHERE = 'where';
+
+    public const LARAVEL_OR_WHERE = 'orWhere';
 
     protected OperatorsConfig $operatorsConfig;
 
@@ -32,7 +30,7 @@ class SearchParameter extends AbstractParameter
     }
 
     /**
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function appendQuery(): void
     {
@@ -53,7 +51,7 @@ class SearchParameter extends AbstractParameter
      * @param  array  $arguments
      * @param  string  $boolOperator
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function makeQuery(Builder $builder, array $arguments, string $boolOperator = self::AND): void
     {
@@ -82,11 +80,18 @@ class SearchParameter extends AbstractParameter
 
             if ($this->hasSubSearch($key, $value)) {
                 // If query has sub-search, it is a relation for sure.
-                $builder->whereHas(Str::camel($key), function ($query) use ($value) {
-                    $jsonQuery = new JsonQuery($query, $value);
+                $normalizedRelation = $this->assertRelationExists($key);
+
+                $builder->whereHas($normalizedRelation, function ($query) use ($value) {
+                    $jsonQuery = new ApiQuery($query, $value);
                     $jsonQuery->search();
                 });
                 continue;
+            }
+
+            if ($this->isRelationColumnSearch($key, $value)) {
+                [$relationPath] = $this->extractRelationAndColumn($key);
+                $this->assertRelationExists($relationPath);
             }
 
             $this->makeSingleQuery($functionName, $builder, $key, $value);
@@ -107,7 +112,7 @@ class SearchParameter extends AbstractParameter
      * @param  string  $boolOperator
      * @return string
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function getQueryFunctionName(string $boolOperator): string
     {
@@ -117,7 +122,7 @@ class SearchParameter extends AbstractParameter
             return self::LARAVEL_OR_WHERE;
         }
 
-        throw new JsonQueryBuilderException('Invalid bool operator provided');
+        throw new ApiQueryBuilderException('Invalid bool operator provided');
     }
 
     protected function queryInitiatedByTopLevelBool($key, $value): bool
@@ -132,13 +137,38 @@ class SearchParameter extends AbstractParameter
         return is_string($key) && is_array($value);
     }
 
+    protected function isRelationColumnSearch($key, $value): bool
+    {
+        return is_string($key)
+            && is_string($value)
+            && str_contains($key, '.');
+    }
+
+    /**
+     * @return array{string, string}
+     *
+     * @throws ApiQueryBuilderException
+     */
+    protected function extractRelationAndColumn(string $key): array
+    {
+        $parts = explode('.', $key);
+        $column = array_pop($parts);
+        $relationPath = implode('.', $parts);
+
+        if ($relationPath === '' || $column === '') {
+            throw new ApiQueryBuilderException("Invalid relation column search key '$key'.");
+        }
+
+        return [$relationPath, $column];
+    }
+
     /**
      * @param  string  $functionName
      * @param  Builder  $builder
      * @param  $key
      * @param  $value
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function makeSingleQuery(string $functionName, Builder $builder, $key, $value): void
     {
@@ -153,7 +183,7 @@ class SearchParameter extends AbstractParameter
      * @param  string  $column
      * @param  string  $argument
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function applyArguments(Builder $builder, OperatorsConfig $operatorsConfig, string $column, string $argument): void
     {
@@ -174,14 +204,14 @@ class SearchParameter extends AbstractParameter
      * @param  $argument
      * @return array
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function splitByBoolOperators($argument): array
     {
         $splitByOr = explode(self::OR, $argument);
 
         if (empty($splitByOr)) {
-            throw new JsonQueryBuilderException('Something went wrong. Did you forget to add arguments?');
+            throw new ApiQueryBuilderException('Something went wrong. Did you forget to add arguments?');
         }
 
         $splitByAnd = [];
@@ -200,7 +230,7 @@ class SearchParameter extends AbstractParameter
      * @param  OperatorsConfig  $operatorsConfig
      * @param  SearchParser  $searchParser
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function appendSingle(Builder $builder, OperatorsConfig $operatorsConfig, SearchParserInterface $searchParser): void
     {

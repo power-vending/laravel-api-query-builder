@@ -1,12 +1,12 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\Tests\Unit\SearchCallbacks;
+namespace PowerVending\LaravelApiQueryBuilder\Tests\Unit\SearchCallbacks;
 
-use Asseco\JsonQueryBuilder\Tests\TestCase;
-use Asseco\JsonQueryBuilder\Types\BooleanType;
 use Exception;
+use PowerVending\LaravelApiQueryBuilder\Tests\TestCase;
+use PowerVending\LaravelApiQueryBuilder\Types\BooleanType;
 
 class BooleanTypeTest extends TestCase
 {

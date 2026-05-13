@@ -1,30 +1,32 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder;
+namespace PowerVending\LaravelApiQueryBuilder;
 
-use Asseco\JsonQueryBuilder\Config\ModelConfig;
-use Asseco\JsonQueryBuilder\Config\RequestParametersConfig;
-use Asseco\JsonQueryBuilder\Exceptions\JsonQueryBuilderException;
-use Asseco\JsonQueryBuilder\RequestParameters\AbstractParameter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
+use PowerVending\LaravelApiQueryBuilder\Config\{ModelConfig, RequestParametersConfig};
+use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
+use PowerVending\LaravelApiQueryBuilder\RequestParameters\AbstractParameter;
 
-class JsonQuery
+class ApiQuery
 {
     protected Builder     $builder;
+
     protected array       $input;
+
     protected ModelConfig $modelConfig;
+
     protected array       $registeredParameters;
 
     /**
-     * JsonQuery constructor.
+     * ApiQuery constructor.
      *
      * @param  Builder  $builder
      * @param  array  $input
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     public function __construct(Builder $builder, array $input)
     {
@@ -38,19 +40,19 @@ class JsonQuery
     }
 
     /**
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function forbidForExistingModels(): void
     {
         if ($this->builder->getModel()->exists) {
-            throw new JsonQueryBuilderException('Searching is not allowed on already loaded models.');
+            throw new ApiQueryBuilderException('Searching is not allowed on already loaded models.');
         }
     }
 
     /**
      * Perform the search.
      *
-     * @throws Exceptions\JsonQueryBuilderException
+     * @throws Exceptions\ApiQueryBuilderException
      */
     public function search(): void
     {
@@ -61,7 +63,7 @@ class JsonQuery
     /**
      * Append all queries from registered parameters.
      *
-     * @throws Exceptions\JsonQueryBuilderException
+     * @throws Exceptions\ApiQueryBuilderException
      */
     protected function appendParameterQueries(): void
     {
@@ -100,12 +102,12 @@ class JsonQuery
      * @param  $requestParameter
      * @return AbstractParameter
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function instantiateRequestParameter(string $requestParameter): AbstractParameter
     {
         if (!is_subclass_of($requestParameter, AbstractParameter::class)) {
-            throw new JsonQueryBuilderException("$requestParameter must extend " . AbstractParameter::class);
+            throw new ApiQueryBuilderException("$requestParameter must extend " . AbstractParameter::class);
         }
 
         $input = $this->wrapInput($requestParameter::getParameterName());

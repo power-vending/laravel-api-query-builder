@@ -1,18 +1,23 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\SearchCallbacks;
+namespace PowerVending\LaravelApiQueryBuilder\SearchCallbacks;
 
-use Asseco\JsonQueryBuilder\CategorizedValues;
 use Exception;
 use Illuminate\Database\Eloquent\Builder;
+use PowerVending\LaravelApiQueryBuilder\CategorizedValues;
 
-class Contains extends AbstractCallback
+class Like extends AbstractCallback
 {
     public static function operator(): string
     {
-        return 'contains';
+        return 'LIKE:';
+    }
+
+    public static function supportsComparableTypes(): bool
+    {
+        return false;
     }
 
     /**

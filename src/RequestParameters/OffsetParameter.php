@@ -1,10 +1,10 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\RequestParameters;
+namespace PowerVending\LaravelApiQueryBuilder\RequestParameters;
 
-use Asseco\JsonQueryBuilder\Exceptions\JsonQueryBuilderException;
+use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
 
 class OffsetParameter extends AbstractParameter
 {
@@ -16,11 +16,11 @@ class OffsetParameter extends AbstractParameter
     protected function areArgumentsValid(): void
     {
         if (count($this->arguments) != 1) {
-            throw new JsonQueryBuilderException("Parameter '{$this->getParameterName()}' expects only one argument.");
+            throw new ApiQueryBuilderException("Parameter '{$this->getParameterName()}' expects only one argument.");
         }
 
         if (!is_numeric($this->arguments[0])) {
-            throw new JsonQueryBuilderException("Parameter '{$this->getParameterName()}' must be numeric.");
+            throw new ApiQueryBuilderException("Parameter '{$this->getParameterName()}' must be numeric.");
         }
     }
 

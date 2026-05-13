@@ -1,6 +1,6 @@
 <?php
 
-namespace Asseco\JsonQueryBuilder\SQLProviders;
+namespace PowerVending\LaravelApiQueryBuilder\SQLProviders;
 
 class PgSQLFunctions extends SQLFunctions
 {

@@ -1,19 +1,20 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\Tests\Unit\RequestParameters;
+namespace PowerVending\LaravelApiQueryBuilder\Tests\Unit\RequestParameters;
 
-use Asseco\JsonQueryBuilder\Config\ModelConfig;
-use Asseco\JsonQueryBuilder\RequestParameters\SoftDeletedParameter;
-use Asseco\JsonQueryBuilder\Tests\TestCase;
 use Exception;
 use Illuminate\Database\Eloquent\Builder;
 use Mockery;
+use PowerVending\LaravelApiQueryBuilder\Config\ModelConfig;
+use PowerVending\LaravelApiQueryBuilder\RequestParameters\SoftDeletedParameter;
+use PowerVending\LaravelApiQueryBuilder\Tests\TestCase;
 
 class SoftDeletedParameterTest extends TestCase
 {
     protected Builder $builder;
+
     protected ModelConfig $modelConfig;
 
     public function setUp(): void

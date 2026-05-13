@@ -1,8 +1,8 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\Types;
+namespace PowerVending\LaravelApiQueryBuilder\Types;
 
 class GenericType extends AbstractType
 {

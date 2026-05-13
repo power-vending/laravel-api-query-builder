@@ -1,14 +1,13 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder;
+namespace PowerVending\LaravelApiQueryBuilder;
 
-use Asseco\JsonQueryBuilder\Config\ModelConfig;
-use Asseco\JsonQueryBuilder\Config\OperatorsConfig;
-use Asseco\JsonQueryBuilder\Exceptions\JsonQueryBuilderException;
-use Asseco\JsonQueryBuilder\Traits\CleansValues;
 use Illuminate\Support\Facades\Config;
+use PowerVending\LaravelApiQueryBuilder\Config\{ModelConfig, OperatorsConfig};
+use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
+use PowerVending\LaravelApiQueryBuilder\Traits\CleansValues;
 
 class SearchParser implements SearchParserInterface
 {
@@ -17,15 +16,20 @@ class SearchParser implements SearchParserInterface
     /**
      * Constant by which values will be split within a single parameter. E.g. parameter=value1;value2.
      */
-    const VALUE_SEPARATOR = ';';
+    public const VALUE_SEPARATOR = ';';
 
     public string $column;
+
     public array  $values;
+
     public string $type;
+
     public string $operator;
 
     private string      $argument;
+
     private ModelConfig $modelConfig;
+
     private bool $from_primary_key;
 
     /**
@@ -36,13 +40,13 @@ class SearchParser implements SearchParserInterface
      * @param  string  $column
      * @param  string  $argument
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     public function __construct(ModelConfig $modelConfig, OperatorsConfig $operatorsConfig, string $column, string $argument)
     {
         $this->modelConfig = $modelConfig;
         $this->from_primary_key = $modelConfig->isPrimaryKey($column);
-        $this->column = $this->from_primary_key ? $modelConfig->getPrimaryColumn(): $column;
+        $this->column = $this->from_primary_key ? $modelConfig->getPrimaryColumn() : $column;
         $this->argument = $argument;
 
         $this->checkForForbiddenColumns();
@@ -56,12 +60,12 @@ class SearchParser implements SearchParserInterface
     /**
      * @return bool
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     public function isModelRelation(): bool
     {
 
-        return str_contains($this->column, '.')  && !$this->from_primary_key;
+        return str_contains($this->column, '.') && !$this->from_primary_key;
     }
 
     /**
@@ -69,7 +73,7 @@ class SearchParser implements SearchParserInterface
      * @param  string  $argument
      * @return string
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function parseOperator($operators, string $argument): string
     {
@@ -83,7 +87,7 @@ class SearchParser implements SearchParserInterface
             return $operator;
         }
 
-        throw new JsonQueryBuilderException("No valid callback registered for $argument. Are you missing an operator?");
+        throw new ApiQueryBuilderException("No valid callback registered for $argument. Are you missing an operator?");
     }
 
     /**
@@ -97,7 +101,7 @@ class SearchParser implements SearchParserInterface
      * @param  string  $values
      * @return array
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function splitValues(string $values): array
     {
@@ -105,7 +109,7 @@ class SearchParser implements SearchParserInterface
         $cleanedUpValues = $this->cleanValues($valueArray);
 
         if (count($cleanedUpValues) < 1) {
-            throw new JsonQueryBuilderException("Column '$this->column' is missing a value.");
+            throw new ApiQueryBuilderException("Column '$this->column' is missing a value.");
         }
 
         return $cleanedUpValues;
@@ -114,14 +118,51 @@ class SearchParser implements SearchParserInterface
     /**
      * @return string
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function getColumnType(): string
     {
+        $castType = $this->modelConfig->getTypeFromCast($this->column);
+
+        if ($castType !== null) {
+            return $castType;
+        }
+
         $columns = $this->modelConfig->getModelColumns();
 
         if (!array_key_exists($this->column, $columns)) {
-            // TODO: integrate recursive column check for related models?
+            if ($this->isModelRelation()) {
+                $parts = explode('.', $this->column);
+                $columnName = array_pop($parts);
+
+                try {
+                    $model = $this->modelConfig->getModel();
+
+                    foreach ($parts as $part) {
+                        if (method_exists($model, $part)) {
+                            $model = $model->{$part}()->getRelated();
+                        } else {
+                            return 'generic';
+                        }
+                    }
+
+                    $relatedConfig = new ModelConfig($model);
+                    $relatedCastType = $relatedConfig->getTypeFromCast($columnName);
+
+                    if ($relatedCastType !== null) {
+                        return $relatedCastType;
+                    }
+
+                    $relatedColumns = $relatedConfig->getModelColumns();
+
+                    if (array_key_exists($columnName, $relatedColumns)) {
+                        return $relatedColumns[$columnName];
+                    }
+                } catch (\Exception $e) {
+                    return 'generic';
+                }
+            }
+
             return 'generic';
         }
 
@@ -131,15 +172,15 @@ class SearchParser implements SearchParserInterface
     /**
      * Check if global forbidden key is used.
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function checkForForbiddenColumns()
     {
-        $forbiddenKeys = Config::get('asseco-json-query-builder.global_forbidden_columns');
+        $forbiddenKeys = Config::get('api-query-builder.global_forbidden_columns');
         $forbiddenKeys = $this->modelConfig->getForbidden($forbiddenKeys);
 
         if (in_array($this->column, $forbiddenKeys)) {
-            throw new JsonQueryBuilderException("Searching by '$this->column' field is forbidden. Check the configuration if this is not a desirable behavior.");
+            throw new ApiQueryBuilderException("Searching by '$this->column' field is forbidden. Check the configuration if this is not a desirable behavior.");
         }
     }
 }

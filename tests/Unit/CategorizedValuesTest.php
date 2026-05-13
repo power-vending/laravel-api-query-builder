@@ -1,13 +1,12 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\Tests\Unit\Parsers;
+namespace PowerVending\LaravelApiQueryBuilder\Tests\Unit\Parsers;
 
-use Asseco\JsonQueryBuilder\CategorizedValues;
-use Asseco\JsonQueryBuilder\SearchParser;
-use Asseco\JsonQueryBuilder\Tests\TestCase;
 use Mockery;
+use PowerVending\LaravelApiQueryBuilder\{CategorizedValues, SearchParser};
+use PowerVending\LaravelApiQueryBuilder\Tests\TestCase;
 
 class CategorizedValuesTest extends TestCase
 {

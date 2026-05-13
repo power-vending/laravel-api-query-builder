@@ -1,11 +1,11 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\Config;
+namespace PowerVending\LaravelApiQueryBuilder\Config;
 
-use Asseco\JsonQueryBuilder\Exceptions\JsonQueryBuilderException;
-use Asseco\JsonQueryBuilder\SearchCallbacks\AbstractCallback;
+use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
+use PowerVending\LaravelApiQueryBuilder\SearchCallbacks\AbstractCallback;
 
 class OperatorsConfig extends SearchConfig
 {
@@ -39,12 +39,12 @@ class OperatorsConfig extends SearchConfig
      * @param  string  $operator
      * @return string
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     public function getCallbackClassFromOperator(string $operator): string
     {
         if (!array_key_exists($operator, $this->operatorCallbackMapping())) {
-            throw new JsonQueryBuilderException("No valid callback registered for '$operator' operator.");
+            throw new ApiQueryBuilderException("No valid callback registered for '$operator' operator.");
         }
 
         return $this->operatorCallbackMapping()[$operator];

@@ -1,10 +1,10 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\Tests;
+namespace PowerVending\LaravelApiQueryBuilder\Tests;
 
-use Asseco\JsonQueryBuilder\JsonQueryServiceProvider;
+use PowerVending\LaravelApiQueryBuilder\ApiQueryServiceProvider;
 
 abstract class TestCase extends \Orchestra\Testbench\TestCase
 {
@@ -15,7 +15,7 @@ abstract class TestCase extends \Orchestra\Testbench\TestCase
 
     protected function getPackageProviders($app)
     {
-        return [JsonQueryServiceProvider::class];
+        return [ApiQueryServiceProvider::class];
     }
 
     protected function getEnvironmentSetUp($app)

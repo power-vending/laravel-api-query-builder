@@ -1,18 +1,19 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\Tests\Unit\SearchCallbacks;
+namespace PowerVending\LaravelApiQueryBuilder\Tests\Unit\SearchCallbacks;
 
-use Asseco\JsonQueryBuilder\SearchCallbacks\NotEquals;
-use Asseco\JsonQueryBuilder\SearchParser;
-use Asseco\JsonQueryBuilder\Tests\TestCase;
 use Illuminate\Database\Eloquent\Builder;
 use Mockery;
+use PowerVending\LaravelApiQueryBuilder\SearchCallbacks\NotEquals;
+use PowerVending\LaravelApiQueryBuilder\SearchParser;
+use PowerVending\LaravelApiQueryBuilder\Tests\TestCase;
 
 class NotEqualsTest extends TestCase
 {
     protected Builder $builder;
+
     protected SearchParser $searchParser;
 
     public function setUp(): void
@@ -27,7 +28,7 @@ class NotEqualsTest extends TestCase
         $this->searchParser = Mockery::mock(SearchParser::class);
         $this->searchParser->type = 'test';
         $this->searchParser->column = 'test';
-        $this->searchParser->shouldReceive('isModelRelation')->andReturn(false); 
+        $this->searchParser->shouldReceive('isModelRelation')->andReturn(false);
     }
 
     /** @test */

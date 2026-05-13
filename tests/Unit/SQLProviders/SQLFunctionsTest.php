@@ -2,10 +2,10 @@
 
 declare (strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\Tests\Unit\SQLProviders;
+namespace PowerVending\LaravelApiQueryBuilder\Tests\Unit\SQLProviders;
 
-use Asseco\JsonQueryBuilder\SQLProviders\SQLFunctions;
-use Asseco\JsonQueryBuilder\Tests\TestCase;
+use PowerVending\LaravelApiQueryBuilder\SQLProviders\SQLFunctions;
+use PowerVending\LaravelApiQueryBuilder\Tests\TestCase;
 
 class SQLFunctionsTest extends TestCase
 {
@@ -29,6 +29,7 @@ class SQLFunctionsTest extends TestCase
     public function test_it_validate_sql_functions()
     {
         $this->expectNotToPerformAssertions();
+
         foreach (SQLFunctions::DB_FUNCTIONS as $fn) {
             $this->functions::validateArgument($fn . ':column');
         }
@@ -52,38 +53,39 @@ class SQLFunctionsTest extends TestCase
         $this->functions::validateArgument("avg:_column as my_avg");
     }
 
-    public function test_it_throws_if_alias_is_not_valid() {
-        $this->expectException(\Asseco\JsonQueryBuilder\Exceptions\JsonQueryBuilderException::class);
+    public function test_it_throws_if_alias_is_not_valid()
+    {
+        $this->expectException(\PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException::class);
         $this->functions::validateArgument("avg:column as my_avg`ds");
     }
 
     public function test_it_throws_an_exception_if_an_invalid_function_is_given()
     {
-        $this->expectException(\Asseco\JsonQueryBuilder\Exceptions\JsonQueryBuilderException::class);
+        $this->expectException(\PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException::class);
         $this->functions::invalidFunction('id');
     }
 
     public function test_it_throws_an_exception_if_an_invalid_argument_is_given()
     {
-        $this->expectException(\Asseco\JsonQueryBuilder\Exceptions\JsonQueryBuilderException::class);
+        $this->expectException(\PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException::class);
         $this->functions::validateArgument('invalid:column');
     }
 
     public function test_it_throws_an_exception_if_an_invalid_column_is_given()
     {
-        $this->expectException(\Asseco\JsonQueryBuilder\Exceptions\JsonQueryBuilderException::class);
+        $this->expectException(\PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException::class);
         $this->functions::validateArgument("avg:'this--sql-scripting-is-`invalid'");
     }
 
     public function test_it_throws_an_exception_if_no_column_is_given()
     {
-        $this->expectException(\Asseco\JsonQueryBuilder\Exceptions\JsonQueryBuilderException::class);
+        $this->expectException(\PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException::class);
         $this->functions::validateArgument('sum');
     }
 
     public function test_it_throws_an_exception_if_no_column_when_nested_is_given()
     {
-        $this->expectException(\Asseco\JsonQueryBuilder\Exceptions\JsonQueryBuilderException::class);
+        $this->expectException(\PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException::class);
         $this->functions::validateArgument('sum:avg');
     }
 }

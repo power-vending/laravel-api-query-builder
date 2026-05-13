@@ -1,14 +1,13 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\Tests\Unit\Config;
+namespace PowerVending\LaravelApiQueryBuilder\Tests\Unit\Config;
 
-use Asseco\JsonQueryBuilder\Config\TypesConfig;
-use Asseco\JsonQueryBuilder\Tests\TestCase;
-use Asseco\JsonQueryBuilder\Types\BooleanType;
-use Asseco\JsonQueryBuilder\Types\GenericType;
 use Exception;
+use PowerVending\LaravelApiQueryBuilder\Config\TypesConfig;
+use PowerVending\LaravelApiQueryBuilder\Tests\TestCase;
+use PowerVending\LaravelApiQueryBuilder\Types\{BooleanType, GenericType};
 
 class TypesConfigTest extends TestCase
 {
@@ -25,7 +24,7 @@ class TypesConfigTest extends TestCase
     {
         $this->expectException(Exception::class);
 
-        config(['asseco-json-query-builder' => []]);
+        config(['api-query-builder' => []]);
 
         new TypesConfig();
     }
@@ -35,8 +34,10 @@ class TypesConfigTest extends TestCase
     {
         $typesConfig = new TypesConfig();
 
-        $this->assertEquals(new BooleanType(),
-            $typesConfig->getTypeClassFromTypeName('boolean'));
+        $this->assertEquals(
+            new BooleanType(),
+            $typesConfig->getTypeClassFromTypeName('boolean')
+        );
     }
 
     /** @test */
@@ -44,8 +45,10 @@ class TypesConfigTest extends TestCase
     {
         $typesConfig = new TypesConfig();
 
-        $this->assertEquals(new GenericType(),
-            $typesConfig->getTypeClassFromTypeName('test'));
+        $this->assertEquals(
+            new GenericType(),
+            $typesConfig->getTypeClassFromTypeName('test')
+        );
     }
 
     /** @test */
@@ -53,11 +56,13 @@ class TypesConfigTest extends TestCase
     {
         $this->expectException(Exception::class);
 
-        config(['asseco-json-query-builder.types' => []]);
+        config(['api-query-builder.types' => []]);
 
         $typesConfig = new TypesConfig();
 
-        $this->assertEquals(new GenericType(),
-            $typesConfig->getTypeClassFromTypeName('test'));
+        $this->assertEquals(
+            new GenericType(),
+            $typesConfig->getTypeClassFromTypeName('test')
+        );
     }
 }

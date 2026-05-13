@@ -1,11 +1,11 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\RequestParameters;
+namespace PowerVending\LaravelApiQueryBuilder\RequestParameters;
 
-use Asseco\JsonQueryBuilder\Exceptions\JsonQueryBuilderException;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
 
 class SoftDeletedParameter extends AbstractParameter
 {
@@ -17,11 +17,11 @@ class SoftDeletedParameter extends AbstractParameter
     protected function areArgumentsValid(): void
     {
         if (count($this->arguments) != 1) {
-            throw new JsonQueryBuilderException("Parameter '{$this->getParameterName()}' expects only one argument.");
+            throw new ApiQueryBuilderException("Parameter '{$this->getParameterName()}' expects only one argument.");
         }
 
         if (!in_array($this->arguments[0], [1, '1', true, 'true'], true)) {
-            throw new JsonQueryBuilderException("Parameter '{$this->getParameterName()}' expects to be 'true' if it is to be used.");
+            throw new ApiQueryBuilderException("Parameter '{$this->getParameterName()}' expects to be 'true' if it is to be used.");
         }
     }
 

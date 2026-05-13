@@ -1,36 +1,60 @@
 <?php
 
-use Asseco\JsonQueryBuilder\RequestParameters\CountParameter;
-use Asseco\JsonQueryBuilder\RequestParameters\DoesntHaveRelationsParameter;
-use Asseco\JsonQueryBuilder\RequestParameters\GroupByParameter;
-use Asseco\JsonQueryBuilder\RequestParameters\LimitParameter;
-use Asseco\JsonQueryBuilder\RequestParameters\OffsetParameter;
-use Asseco\JsonQueryBuilder\RequestParameters\OrderByParameter;
-use Asseco\JsonQueryBuilder\RequestParameters\RelationsParameter;
-use Asseco\JsonQueryBuilder\RequestParameters\ReturnsParameter;
-use Asseco\JsonQueryBuilder\RequestParameters\SearchParameter;
-use Asseco\JsonQueryBuilder\RequestParameters\SoftDeletedParameter;
-use Asseco\JsonQueryBuilder\SearchCallbacks\Between;
-use Asseco\JsonQueryBuilder\SearchCallbacks\Contains;
-use Asseco\JsonQueryBuilder\SearchCallbacks\EndsWith;
-use Asseco\JsonQueryBuilder\SearchCallbacks\Equals;
-use Asseco\JsonQueryBuilder\SearchCallbacks\GreaterThan;
-use Asseco\JsonQueryBuilder\SearchCallbacks\GreaterThanOrEqual;
-use Asseco\JsonQueryBuilder\SearchCallbacks\LessThan;
-use Asseco\JsonQueryBuilder\SearchCallbacks\LessThanOrEqual;
-use Asseco\JsonQueryBuilder\SearchCallbacks\NotBetween;
-use Asseco\JsonQueryBuilder\SearchCallbacks\NotEquals;
-use Asseco\JsonQueryBuilder\SearchCallbacks\StartsWith;
-use Asseco\JsonQueryBuilder\Types\BooleanType;
-use Asseco\JsonQueryBuilder\Types\GenericType;
+use PowerVending\LaravelApiQueryBuilder\Http\Controllers\SchemaController;
+use PowerVending\LaravelApiQueryBuilder\RequestParameters\{
+    CountParameter,
+    DoesntHaveRelationsParameter,
+    ExceptsParameter,
+    GroupByParameter,
+    LimitParameter,
+    OffsetParameter,
+    OrderByParameter,
+    RelationsParameter,
+    ReturnsParameter,
+    SearchParameter,
+    SoftDeletedParameter};
+use PowerVending\LaravelApiQueryBuilder\SearchCallbacks\{
+    Between,
+    EndsWith,
+    Equals,
+    GreaterThan,
+    GreaterThanOrEqual,
+    JsonSearch,
+    LessThan,
+    LessThanOrEqual,
+    Like,
+    NotBetween,
+    NotEquals,
+    StartsWith};
+use PowerVending\LaravelApiQueryBuilder\Types\{BooleanType, GenericType};
 
 return [
+    /**
+     * Routes exposed by the package.
+     * Key is the full route name.
+     *
+     * Each route accepts:
+     *  - method: HTTP method
+     *  - uri: full URI path
+     *  - action: [Controller::class, 'method']
+     *  - middlewares: array of middleware aliases
+     */
+    'routes' => [
+        'api.query_builder.schema.show' => [
+            'method' => 'get',
+            'uri' => 'api-query-builder/{resource}/schema',
+            'action' => [SchemaController::class, 'show'],
+            'middlewares' => ['api'],
+        ],
+    ],
+
     /**
      * Registered request parameters.
      */
     'request_parameters' => [
         SearchParameter::class,
         ReturnsParameter::class,
+        ExceptsParameter::class,
         OrderByParameter::class,
         RelationsParameter::class,
         LimitParameter::class,
@@ -46,17 +70,18 @@ return [
      * Callbacks having more const OPERATOR characters must come before those with less.
      */
     'operators' => [
-        NotBetween::class,
-        LessThanOrEqual::class,
-        GreaterThanOrEqual::class,
-        Between::class,
-        NotEquals::class,
-        Equals::class,
-        LessThan::class,
-        GreaterThan::class,
-        Contains::class,
-        StartsWith::class,
-        EndsWith::class,
+        StartsWith::class,       // STARTS_WITH: (13 chars)
+        JsonSearch::class,       // JSON_SEARCH: (12 chars)
+        EndsWith::class,         // ENDS_WITH: (10 chars)
+        Like::class,             // LIKE: (5 chars)
+        NotEquals::class,        // NE: (3 chars)
+        NotBetween::class,       // NB: (3 chars)
+        LessThanOrEqual::class,  // LE: (3 chars)
+        GreaterThanOrEqual::class, // GE: (3 chars)
+        Between::class,          // BT: (3 chars)
+        Equals::class,           // EQ: (3 chars)
+        LessThan::class,         // LT: (3 chars)
+        GreaterThan::class,      // GT: (3 chars)
     ],
 
     /**
@@ -83,7 +108,6 @@ return [
      * Use if you want to enforce rules on a specific model without affecting globally all models.
      */
     'model_options' => [
-
         /**
          * For real usage, use real models without quotes. This is only meant to show the available options.
          */

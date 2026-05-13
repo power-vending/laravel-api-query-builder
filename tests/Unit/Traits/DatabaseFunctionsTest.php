@@ -1,13 +1,13 @@
 <?php
 
-namespace Asseco\JsonQueryBuilder\Tests\Unit\Traits;
+namespace PowerVending\LaravelApiQueryBuilder\Tests\Unit\Traits;
 
-use Asseco\JsonQueryBuilder\Config\ModelConfig;
-use Asseco\JsonQueryBuilder\RequestParameters\AbstractParameter;
-use Asseco\JsonQueryBuilder\SQLProviders\SQLFunctions;
-use Asseco\JsonQueryBuilder\Tests\TestCase;
-use Asseco\JsonQueryBuilder\Traits\DatabaseFunctions;
 use Illuminate\Database\Eloquent\Builder;
+use PowerVending\LaravelApiQueryBuilder\Config\ModelConfig;
+use PowerVending\LaravelApiQueryBuilder\RequestParameters\AbstractParameter;
+use PowerVending\LaravelApiQueryBuilder\SQLProviders\SQLFunctions;
+use PowerVending\LaravelApiQueryBuilder\Tests\TestCase;
+use PowerVending\LaravelApiQueryBuilder\Traits\DatabaseFunctions;
 
 class TestParameterClass extends AbstractParameter
 {
@@ -28,6 +28,7 @@ class TestParameterClass extends AbstractParameter
 class DatabaseFunctionsTest extends TestCase
 {
     protected Builder $builder;
+
     protected ModelConfig $modelConfig;
 
     public function setUp(): void
@@ -82,9 +83,10 @@ class DatabaseFunctionsTest extends TestCase
         $this->assertEquals('select count(*) as count', $this->builder->toSql());
     }
 
-    function test_it_should_use_the_right_alias_parameter()  {
+    public function test_it_should_use_the_right_alias_parameter()
+    {
         app('config')->set('database.default', 'pgsql');
-        $parameter = new TestParameterClass(['avg:day:column as the_avg'], $this->builder, $this->modelConfig); 
+        $parameter = new TestParameterClass(['avg:day:column as the_avg'], $this->builder, $this->modelConfig);
         $this->assertNull($parameter->run());
         $this->assertEquals('select avg(EXTRACT(DAY FROM "column")) as the_avg', $this->builder->toSql());
     }

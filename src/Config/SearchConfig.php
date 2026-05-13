@@ -1,38 +1,39 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\Config;
+namespace PowerVending\LaravelApiQueryBuilder\Config;
 
-use Asseco\JsonQueryBuilder\Exceptions\JsonQueryBuilderException;
+use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
 
 abstract class SearchConfig
 {
-    protected array $config;
     public array    $registered;
+
+    protected array $config;
 
     /**
      * SearchConfig constructor.
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     public function __construct()
     {
-        $this->config = config('asseco-json-query-builder');
+        $this->config = config('api-query-builder');
         $this->register();
     }
 
     /**
      * Get registered classes from configuration file.
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function register(): void
     {
         $key = $this->configKey();
 
         if (!array_key_exists($key, $this->config)) {
-            throw new JsonQueryBuilderException("Config file is missing '$key'");
+            throw new ApiQueryBuilderException("Config file is missing '$key'");
         }
 
         $this->registered = $this->config[$key];

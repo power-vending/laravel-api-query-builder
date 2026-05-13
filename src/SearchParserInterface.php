@@ -1,9 +1,7 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder;
+namespace PowerVending\LaravelApiQueryBuilder;
 
-interface SearchParserInterface
-{
-}
+interface SearchParserInterface {}
