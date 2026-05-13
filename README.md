@@ -349,15 +349,14 @@ GET /api-query-builder/products/schema?relations[]=category.parent
 
 Comportamento de `relations`:
 
-1. Sem `relations`: usa relações padrões do modelo
-2. `relations[]` informado: mescla com as relações padrão (não sobrescreve)
-3. Para cada relação enviada em `relations[]`, também são carregadas as relações configuradas do model relacionado (descendentes)
-4. Relação inexistente: lança erro de validação de relação (tratável pelo Handler da aplicação)
+1. Sem `relations`: **auto-descobre e carrega automaticamente todas as relações públicas do modelo**
+2. `relations[]` informado: adiciona essas relações ao resultado (mescla com as auto-descobertas)
+3. Relação inexistente: lança erro de validação de relação (tratável pelo Handler da aplicação)
 
 Exemplo:
 
-1. `GET /api-query-builder/terminals/schema` retorna as relações padrão configuradas do model `Terminal`
-2. `GET /api-query-builder/terminals/schema?relations[]=company` retorna as relações padrão de `Terminal` + `company` + descendentes configurados de `Company` (ex.: `company.address`, `company.owner`, etc.)
+1. `GET /api-query-builder/terminals/schema` retorna **automaticamente** todas as relações públicas do model `Terminal`
+2. `GET /api-query-builder/terminals/schema?relations[]=company` retorna as relações auto-descobertas de `Terminal` + `company`
 
 Exemplo resumido de resposta:
 

@@ -26,9 +26,6 @@ class SchemaTest extends TestCase
         ]]);
 
         config(['api-query-builder.model_options' => [
-            TestModel::class => [
-                'relations' => ['related.nested'],
-            ],
             \PowerVending\LaravelApiQueryBuilder\Tests\CompanyModel::class => [
                 'relations' => ['address'],
             ],
@@ -151,8 +148,6 @@ class SchemaTest extends TestCase
 
         $this->assertArrayHasKey('related', $payload['relations']);
         $this->assertSame('related', $payload['relations']['related']['table']);
-        $this->assertArrayHasKey('nested', $payload['relations']['related']['relations']);
-        $this->assertSame('nested', $payload['relations']['related']['relations']['nested']['table']);
     }
 
     /** @test */
@@ -165,21 +160,26 @@ class SchemaTest extends TestCase
         $this->assertIsArray($payload);
 
         $this->assertArrayHasKey('related', $payload['relations']);
-        $this->assertArrayHasKey('nested', $payload['relations']['related']['relations']);
+        $this->assertArrayHasKey('tags', $payload['relations']);
+        $this->assertArrayHasKey('company', $payload['relations']);
     }
 
     /** @test */
-    public function expands_requested_relation_with_all_configured_descendants_of_related_model()
+    public function auto_discovers_relations_when_not_configured_in_model_options()
     {
-        $response = $this->getJson('/api-query-builder/tests/schema?relations[]=company');
+        config(['api-query-builder.model_options' => []]);
+
+        $response = $this->getJson('/api-query-builder/tests/schema');
         $response->assertOk();
 
         $payload = $response->json();
         $this->assertIsArray($payload);
 
+        $this->assertArrayHasKey('relations', $payload);
+        $this->assertIsArray($payload['relations']);
         $this->assertArrayHasKey('related', $payload['relations']);
         $this->assertArrayHasKey('company', $payload['relations']);
-        $this->assertArrayHasKey('address', $payload['relations']['company']['relations']);
+        $this->assertArrayHasKey('tags', $payload['relations']);
     }
 
     private function getSchemaPayload(): array
