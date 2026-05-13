@@ -4,7 +4,6 @@ declare(strict_types = 1);
 
 namespace PowerVending\LaravelApiQueryBuilder\RequestParameters;
 
-use Illuminate\Support\Str;
 use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
 
 class DoesntHaveRelationsParameter extends AbstractParameter
@@ -18,7 +17,9 @@ class DoesntHaveRelationsParameter extends AbstractParameter
     {
         foreach ($this->arguments as $argument) {
             if (is_string($argument)) {
-                $this->builder->doesntHave(Str::camel($argument));
+                $normalizedRelation = $this->assertRelationExists($argument);
+
+                $this->builder->doesntHave($normalizedRelation);
                 continue;
             }
 

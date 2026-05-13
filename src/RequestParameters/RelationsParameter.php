@@ -4,7 +4,6 @@ declare(strict_types = 1);
 
 namespace PowerVending\LaravelApiQueryBuilder\RequestParameters;
 
-use Illuminate\Support\Str;
 use PowerVending\LaravelApiQueryBuilder\ApiQuery;
 use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
 
@@ -34,15 +33,18 @@ class RelationsParameter extends AbstractParameter
 
     protected function appendSimpleRelation(string $argument): void
     {
-        $this->builder->with(Str::camel($argument));
+        $normalizedRelation = $this->assertRelationExists($argument);
+
+        $this->builder->with($normalizedRelation);
     }
 
     protected function appendComplexRelation(array $argument): void
     {
         $relation = key($argument);
         $input = $argument[$relation];
+        $normalizedRelation = $this->assertRelationExists($relation);
 
-        $this->builder->with([Str::camel($relation) => function ($query) use ($input) {
+        $this->builder->with([$normalizedRelation => function ($query) use ($input) {
             $jsonQuery = new ApiQuery($query->getQuery(), $input);
             $jsonQuery->search();
         }]);

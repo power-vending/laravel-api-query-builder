@@ -5,7 +5,6 @@ declare(strict_types = 1);
 namespace PowerVending\LaravelApiQueryBuilder\RequestParameters;
 
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Str;
 use PowerVending\LaravelApiQueryBuilder\{ApiQuery, CustomFieldSearchParser, SearchParser, SearchParserInterface};
 use PowerVending\LaravelApiQueryBuilder\Config\OperatorsConfig;
 use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
@@ -81,11 +80,18 @@ class SearchParameter extends AbstractParameter
 
             if ($this->hasSubSearch($key, $value)) {
                 // If query has sub-search, it is a relation for sure.
-                $builder->whereHas(Str::camel($key), function ($query) use ($value) {
+                $normalizedRelation = $this->assertRelationExists($key);
+
+                $builder->whereHas($normalizedRelation, function ($query) use ($value) {
                     $jsonQuery = new ApiQuery($query, $value);
                     $jsonQuery->search();
                 });
                 continue;
+            }
+
+            if ($this->isRelationColumnSearch($key, $value)) {
+                [$relationPath] = $this->extractRelationAndColumn($key);
+                $this->assertRelationExists($relationPath);
             }
 
             $this->makeSingleQuery($functionName, $builder, $key, $value);
@@ -129,6 +135,31 @@ class SearchParameter extends AbstractParameter
     protected function hasSubSearch($key, $value): bool
     {
         return is_string($key) && is_array($value);
+    }
+
+    protected function isRelationColumnSearch($key, $value): bool
+    {
+        return is_string($key)
+            && is_string($value)
+            && str_contains($key, '.');
+    }
+
+    /**
+     * @return array{string, string}
+     *
+     * @throws ApiQueryBuilderException
+     */
+    protected function extractRelationAndColumn(string $key): array
+    {
+        $parts = explode('.', $key);
+        $column = array_pop($parts);
+        $relationPath = implode('.', $parts);
+
+        if ($relationPath === '' || $column === '') {
+            throw new ApiQueryBuilderException("Invalid relation column search key '$key'.");
+        }
+
+        return [$relationPath, $column];
     }
 
     /**
