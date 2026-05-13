@@ -1,12 +1,11 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\RequestParameters;
+namespace PowerVending\LaravelApiQueryBuilder\RequestParameters;
 
-use Asseco\JsonQueryBuilder\Exceptions\JsonQueryBuilderException;
-use Asseco\JsonQueryBuilder\JsonQuery;
-use Illuminate\Support\Str;
+use PowerVending\LaravelApiQueryBuilder\ApiQuery;
+use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
 
 class RelationsParameter extends AbstractParameter
 {
@@ -28,22 +27,25 @@ class RelationsParameter extends AbstractParameter
                 continue;
             }
 
-            throw new JsonQueryBuilderException('Wrong relation parameters provided.');
+            throw new ApiQueryBuilderException('Wrong relation parameters provided.');
         }
     }
 
     protected function appendSimpleRelation(string $argument): void
     {
-        $this->builder->with(Str::camel($argument));
+        $normalizedRelation = $this->assertRelationExists($argument);
+
+        $this->builder->with($normalizedRelation);
     }
 
     protected function appendComplexRelation(array $argument): void
     {
         $relation = key($argument);
         $input = $argument[$relation];
+        $normalizedRelation = $this->assertRelationExists($relation);
 
-        $this->builder->with([Str::camel($relation) => function ($query) use ($input) {
-            $jsonQuery = new JsonQuery($query->getQuery(), $input);
+        $this->builder->with([$normalizedRelation => function ($query) use ($input) {
+            $jsonQuery = new ApiQuery($query->getQuery(), $input);
             $jsonQuery->search();
         }]);
     }

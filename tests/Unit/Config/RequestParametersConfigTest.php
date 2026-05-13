@@ -1,12 +1,12 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\Tests\Unit\Config;
+namespace PowerVending\LaravelApiQueryBuilder\Tests\Unit\Config;
 
-use Asseco\JsonQueryBuilder\Config\RequestParametersConfig;
-use Asseco\JsonQueryBuilder\Tests\TestCase;
 use Exception;
+use PowerVending\LaravelApiQueryBuilder\Config\RequestParametersConfig;
+use PowerVending\LaravelApiQueryBuilder\Tests\TestCase;
 
 class RequestParametersConfigTest extends TestCase
 {
@@ -23,7 +23,7 @@ class RequestParametersConfigTest extends TestCase
     {
         $this->expectException(Exception::class);
 
-        config(['asseco-json-query-builder' => []]);
+        config(['api-query-builder' => []]);
 
         new RequestParametersConfig();
     }

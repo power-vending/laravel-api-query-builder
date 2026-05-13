@@ -1,30 +1,40 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder;
+namespace PowerVending\LaravelApiQueryBuilder;
 
-use Asseco\JsonQueryBuilder\Config\TypesConfig;
-use Asseco\JsonQueryBuilder\Types\AbstractType;
+use PowerVending\LaravelApiQueryBuilder\Config\TypesConfig;
+use PowerVending\LaravelApiQueryBuilder\Types\AbstractType;
 
 class CategorizedValues
 {
     /**
      * Constants for micro-operator declaration.
      */
-    const NOT = '!';
-    const LIKE = '%';
-    const IS_NULL = 'null';
-    const IS_NOT_NULL = '!null';
+    public const NOT = '!';
 
-    protected SearchParserInterface $searchParser;
+    public const LIKE = '%';
+
+    public const IS_NULL = 'null';
+
+    public const IS_NOT_NULL = '!null';
+
+    public const STRING_TYPES = ['string', 'varchar', 'char', 'text', 'longtext', 'mediumtext', 'tinytext'];
 
     public array $and = [];
+
     public array $andLike = [];
+
     public array $not = [];
+
     public array $notLike = [];
+
     public bool  $null = false;
+
     public bool  $notNull = false;
+
+    protected SearchParserInterface $searchParser;
 
     protected AbstractType $type;
 
@@ -33,7 +43,7 @@ class CategorizedValues
      *
      * @param  SearchParserInterface  $searchParser
      *
-     * @throws Exceptions\JsonQueryBuilderException
+     * @throws Exceptions\ApiQueryBuilderException
      */
     public function __construct(SearchParserInterface $searchParser)
     {
@@ -121,6 +131,6 @@ class CategorizedValues
     // Not happy with this solution, might need to refactor this later
     protected function isSingleStringValue(): bool
     {
-        return count($this->searchParser->values) == 1 && $this->searchParser->type == 'string';
+        return count($this->searchParser->values) == 1 && in_array($this->searchParser->type, self::STRING_TYPES);
     }
 }

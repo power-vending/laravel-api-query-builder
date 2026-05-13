@@ -1,10 +1,10 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\Types;
+namespace PowerVending\LaravelApiQueryBuilder\Types;
 
-use Asseco\JsonQueryBuilder\Exceptions\JsonQueryBuilderException;
+use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
 
 class BooleanType extends AbstractType
 {
@@ -17,7 +17,7 @@ class BooleanType extends AbstractType
      * @param  array  $values
      * @return array
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     public function prepare(array $values): array
     {
@@ -25,7 +25,7 @@ class BooleanType extends AbstractType
             $value = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
 
             if ($value === null) {
-                throw new JsonQueryBuilderException('Wrong argument type provided');
+                throw new ApiQueryBuilderException('Wrong argument type provided');
             }
         }
 

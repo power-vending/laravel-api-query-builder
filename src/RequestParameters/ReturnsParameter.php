@@ -1,10 +1,10 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\RequestParameters;
+namespace PowerVending\LaravelApiQueryBuilder\RequestParameters;
 
-use Asseco\JsonQueryBuilder\Traits\DatabaseFunctions;
+use PowerVending\LaravelApiQueryBuilder\Traits\DatabaseFunctions;
 
 class ReturnsParameter extends AbstractParameter
 {

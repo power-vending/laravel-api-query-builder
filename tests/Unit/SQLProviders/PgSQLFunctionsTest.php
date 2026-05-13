@@ -1,12 +1,11 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\Tests\Unit\SQLProviders;
+namespace PowerVending\LaravelApiQueryBuilder\Tests\Unit\SQLProviders;
 
-use Asseco\JsonQueryBuilder\SQLProviders\PgSQLFunctions;
-use Asseco\JsonQueryBuilder\SQLProviders\SQLFunctions;
-use Asseco\JsonQueryBuilder\Tests\TestCase;
+use PowerVending\LaravelApiQueryBuilder\SQLProviders\{PgSQLFunctions, SQLFunctions};
+use PowerVending\LaravelApiQueryBuilder\Tests\TestCase;
 
 class PgSQLFunctionsTest extends TestCase
 {

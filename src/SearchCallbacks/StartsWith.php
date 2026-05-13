@@ -1,18 +1,23 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\SearchCallbacks;
+namespace PowerVending\LaravelApiQueryBuilder\SearchCallbacks;
 
-use Asseco\JsonQueryBuilder\CategorizedValues;
 use Exception;
 use Illuminate\Database\Eloquent\Builder;
+use PowerVending\LaravelApiQueryBuilder\CategorizedValues;
 
 class StartsWith extends AbstractCallback
 {
     public static function operator(): string
     {
-        return 'starts_with';
+        return 'STARTS_WITH:';
+    }
+
+    public static function supportsComparableTypes(): bool
+    {
+        return false;
     }
 
     /**

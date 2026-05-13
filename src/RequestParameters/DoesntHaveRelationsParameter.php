@@ -1,11 +1,10 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\RequestParameters;
+namespace PowerVending\LaravelApiQueryBuilder\RequestParameters;
 
-use Asseco\JsonQueryBuilder\Exceptions\JsonQueryBuilderException;
-use Illuminate\Support\Str;
+use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
 
 class DoesntHaveRelationsParameter extends AbstractParameter
 {
@@ -18,11 +17,13 @@ class DoesntHaveRelationsParameter extends AbstractParameter
     {
         foreach ($this->arguments as $argument) {
             if (is_string($argument)) {
-                $this->builder->doesntHave(Str::camel($argument));
+                $normalizedRelation = $this->assertRelationExists($argument);
+
+                $this->builder->doesntHave($normalizedRelation);
                 continue;
             }
 
-            throw new JsonQueryBuilderException('Wrong relation parameters provided.');
+            throw new ApiQueryBuilderException('Wrong relation parameters provided.');
         }
     }
 }

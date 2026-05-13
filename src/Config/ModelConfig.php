@@ -1,8 +1,8 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\Config;
+namespace PowerVending\LaravelApiQueryBuilder\Config;
 
 use Exception;
 use Illuminate\Database\Eloquent\Model;
@@ -11,10 +11,12 @@ use Illuminate\Support\Facades\Cache;
 
 class ModelConfig
 {
-    const CACHE_PREFIX = 'table_def_';
-    const CACHE_TTL = 86400;
+    public const CACHE_PREFIX = 'table_def_';
+
+    public const CACHE_TTL = 86400;
 
     private Model $model;
+
     private array $config;
 
     public function __construct(Model $model)
@@ -23,6 +25,10 @@ class ModelConfig
         $this->config = $this->hasConfig() ? $this->getConfig() : [];
     }
 
+    public function getModel(): Model
+    {
+        return $this->model;
+    }
 
     public function getPrimaryColumn(): string
     {
@@ -31,24 +37,19 @@ class ModelConfig
         return $table . '.' . $primaryKey;
     }
 
-    /**
-     * @param string $column
-     *
-     * @return bool
-     */
-    public function isPrimaryKey($column): bool
+    public function isPrimaryKey(string $column): bool
     {
         return $this->model->getKeyName() === $column;
     }
 
     public function hasConfig(): bool
     {
-        return array_key_exists(get_class($this->model), config('asseco-json-query-builder.model_options'));
+        return array_key_exists(get_class($this->model), config('api-query-builder.model_options'));
     }
 
     protected function getConfig(): array
     {
-        return config('asseco-json-query-builder.model_options.' . get_class($this->model));
+        return config('api-query-builder.model_options.' . get_class($this->model));
     }
 
     public function getReturns(): array
@@ -82,13 +83,7 @@ class ModelConfig
         return $parameters;
     }
 
-    /**
-     * Union of Eloquent exclusion (guarded/fillable) and forbidden columns.
-     *
-     * @param  array  $forbiddenKeys
-     * @return array
-     */
-    public function getForbidden(array $forbiddenKeys)
+    public function getForbidden(array $forbiddenKeys): array
     {
         $forbiddenKeys = $this->getEloquentExclusion($forbiddenKeys);
         $forbiddenKeys = $this->getForbiddenColumns($forbiddenKeys);
@@ -105,7 +100,7 @@ class ModelConfig
         $guarded = $this->model->getGuarded();
         $fillable = $this->model->getFillable();
 
-        if ($guarded[0] != '*') { // Guarded property is never empty. It is '*' by default.
+        if ($guarded[0] != '*') {
             $forbiddenKeys = array_merge($forbiddenKeys, $guarded);
         } elseif (count($fillable) > 0) {
             $forbiddenKeys = array_diff(array_keys($this->getModelColumns()), $fillable);
@@ -116,19 +111,26 @@ class ModelConfig
 
     protected function getForbiddenColumns(array $forbiddenKeys): array
     {
-        if (!array_key_exists('forbidden_columns', $this->config) || !$this->config['forbidden_columns']) {
-            return $forbiddenKeys;
+        if (property_exists($this->model, 'forbiddenColumns')) {
+            $reflection = new \ReflectionClass($this->model);
+
+            if ($reflection->hasProperty('forbiddenColumns')) {
+                $property = $reflection->getProperty('forbiddenColumns');
+                $modelForbidden = $property->getValue($this->model);
+
+                if (is_array($modelForbidden) && !empty($modelForbidden)) {
+                    $forbiddenKeys = array_merge($forbiddenKeys, $modelForbidden);
+                }
+            }
         }
 
-        return array_merge($forbiddenKeys, $this->config['forbidden_columns']);
+        if (array_key_exists('forbidden_columns', $this->config) && $this->config['forbidden_columns']) {
+            $forbiddenKeys = array_merge($forbiddenKeys, $this->config['forbidden_columns']);
+        }
+
+        return $forbiddenKeys;
     }
 
-    /**
-     * Will return column and column type array for a calling model.
-     * Column types will equal Eloquent column types.
-     *
-     * @return array
-     */
     public function getModelColumns(): array
     {
         $table = $this->model->getTable();
@@ -156,10 +158,25 @@ class ModelConfig
         return $modelColumns;
     }
 
-    /**
-     * Having 'enum' in table definition will throw Doctrine error because it is not defined in their types.
-     * Registering it manually.
-     */
+    public function getTypeFromCast(string $column): ?string
+    {
+        $casts = $this->model->getCasts();
+
+        if (!array_key_exists($column, $casts)) {
+            return null;
+        }
+
+        $cast = (string) $casts[$column];
+
+        if (stripos($cast, 'encrypted:') === 0) {
+            $cast = explode(':', $cast, 2)[1] ?? '';
+        } else {
+            $cast = explode(':', $cast, 2)[0];
+        }
+
+        return $cast !== '' ? $cast : null;
+    }
+
     protected function registerEnumTypeForDoctrine($connection): void
     {
         if (

@@ -1,18 +1,19 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\Tests\Unit\SearchCallbacks;
+namespace PowerVending\LaravelApiQueryBuilder\Tests\Unit\SearchCallbacks;
 
-use Asseco\JsonQueryBuilder\SearchCallbacks\GreaterThanOrEqual;
-use Asseco\JsonQueryBuilder\SearchParser;
-use Asseco\JsonQueryBuilder\Tests\TestCase;
 use Illuminate\Database\Eloquent\Builder;
 use Mockery;
+use PowerVending\LaravelApiQueryBuilder\SearchCallbacks\GreaterThanOrEqual;
+use PowerVending\LaravelApiQueryBuilder\SearchParser;
+use PowerVending\LaravelApiQueryBuilder\Tests\TestCase;
 
 class GreaterThanOrEqualTest extends TestCase
 {
     protected Builder $builder;
+
     protected SearchParser $searchParser;
 
     public function setUp(): void

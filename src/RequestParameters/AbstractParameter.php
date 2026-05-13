@@ -1,17 +1,23 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\RequestParameters;
+namespace PowerVending\LaravelApiQueryBuilder\RequestParameters;
 
-use Asseco\JsonQueryBuilder\Config\ModelConfig;
-use Asseco\JsonQueryBuilder\Exceptions\JsonQueryBuilderException;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Str;
+use PowerVending\LaravelApiQueryBuilder\Config\ModelConfig;
+use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
+use PowerVending\LaravelApiQueryBuilder\Exceptions\InvalidRelationException;
 
 abstract class AbstractParameter
 {
     public Builder     $builder;
+
     public ModelConfig $modelConfig;
+
     protected array    $arguments;
 
     /**
@@ -38,12 +44,12 @@ abstract class AbstractParameter
     /**
      * Append the query to Eloquent builder.
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     abstract protected function appendQuery(): void;
 
     /**
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     public function run(): void
     {
@@ -54,14 +60,63 @@ abstract class AbstractParameter
     /**
      * Check validity of fetched arguments and throw exception if it fails.
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function areArgumentsValid(): void
     {
         if (count($this->arguments) < 1) {
-            throw new JsonQueryBuilderException("Couldn't get values for '{$this->getParameterName()}'.");
+            throw new ApiQueryBuilderException("Couldn't get values for '{$this->getParameterName()}'.");
         }
 
         // Override or extend on child objects if needed
+    }
+
+    /**
+     * Validate relation path and return normalized (camel-cased) dot notation.
+     *
+     * @throws InvalidRelationException
+     */
+    protected function assertRelationExists(string $relationPath): string
+    {
+        $segments = array_values(array_filter(explode('.', $relationPath), fn (string $segment) => trim($segment) !== ''));
+
+        if ($segments === []) {
+            throw new InvalidRelationException("Relation '$relationPath' does not exist on model '" . get_class($this->builder->getModel()) . "'.");
+        }
+
+        $currentModel = $this->builder->getModel();
+        $normalizedSegments = [];
+
+        foreach ($segments as $segment) {
+            $method = Str::camel($segment);
+
+            $relation = $this->resolveRelation($currentModel, $method);
+
+            if ($relation === null) {
+                throw new InvalidRelationException(
+                    "Relation '$method' does not exist on model '" . get_class($currentModel) . "'."
+                );
+            }
+
+            $normalizedSegments[] = $method;
+            $currentModel = $relation->getRelated();
+        }
+
+        return implode('.', $normalizedSegments);
+    }
+
+    protected function resolveRelation(Model $model, string $method): ?Relation
+    {
+        if (!method_exists($model, $method)) {
+            return null;
+        }
+
+        try {
+            $relation = $model->{$method}();
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $relation instanceof Relation ? $relation : null;
     }
 }

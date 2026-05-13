@@ -1,17 +1,22 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\SearchCallbacks;
+namespace PowerVending\LaravelApiQueryBuilder\SearchCallbacks;
 
-use Asseco\JsonQueryBuilder\CategorizedValues;
 use Illuminate\Database\Eloquent\Builder;
+use PowerVending\LaravelApiQueryBuilder\CategorizedValues;
 
 class LessThan extends AbstractCallback
 {
     public static function operator(): string
     {
-        return '<';
+        return 'LT:';
+    }
+
+    public static function supportsTextTypes(): bool
+    {
+        return false;
     }
 
     public function execute(Builder $builder, string $column, CategorizedValues $values): void

@@ -1,11 +1,11 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\Config;
+namespace PowerVending\LaravelApiQueryBuilder\Config;
 
-use Asseco\JsonQueryBuilder\Exceptions\JsonQueryBuilderException;
-use Asseco\JsonQueryBuilder\Types\AbstractType;
+use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
+use PowerVending\LaravelApiQueryBuilder\Types\AbstractType;
 
 class TypesConfig extends SearchConfig
 {
@@ -18,7 +18,7 @@ class TypesConfig extends SearchConfig
      * @param  string  $typeName
      * @return mixed
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     public function getTypeClassFromTypeName(string $typeName): AbstractType
     {
@@ -26,7 +26,7 @@ class TypesConfig extends SearchConfig
 
         if (!array_key_exists($typeName, $mapping)) {
             if (!array_key_exists('generic', $mapping)) {
-                throw new JsonQueryBuilderException("No valid callback for '$typeName' type.");
+                throw new ApiQueryBuilderException("No valid callback for '$typeName' type.");
             }
 
             return new $mapping['generic'];

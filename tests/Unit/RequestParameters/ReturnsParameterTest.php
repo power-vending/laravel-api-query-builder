@@ -1,19 +1,20 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\Tests\Unit\RequestParameters;
+namespace PowerVending\LaravelApiQueryBuilder\Tests\Unit\RequestParameters;
 
-use Asseco\JsonQueryBuilder\Config\ModelConfig;
-use Asseco\JsonQueryBuilder\RequestParameters\ReturnsParameter;
-use Asseco\JsonQueryBuilder\Tests\TestCase;
 use Exception;
 use Illuminate\Database\Eloquent\Builder;
 use Mockery;
+use PowerVending\LaravelApiQueryBuilder\Config\ModelConfig;
+use PowerVending\LaravelApiQueryBuilder\RequestParameters\ReturnsParameter;
+use PowerVending\LaravelApiQueryBuilder\Tests\TestCase;
 
 class ReturnsParameterTest extends TestCase
 {
     protected Builder $builder;
+
     protected ModelConfig $modelConfig;
 
     public function setUp(): void
@@ -37,7 +38,10 @@ class ReturnsParameterTest extends TestCase
     public function accepts_valid_arguments()
     {
         $returnsParameter = new ReturnsParameter(
-            ['attribute1', 'attribute2'], $this->builder, $this->modelConfig);
+            ['attribute1', 'attribute2'],
+            $this->builder,
+            $this->modelConfig
+        );
         $returnsParameter->run();
 
         $this->assertTrue(true);
@@ -56,7 +60,10 @@ class ReturnsParameterTest extends TestCase
     public function produces_query()
     {
         $returnsParameter = new ReturnsParameter(
-            ['attribute1', 'attribute2'], $this->builder, $this->modelConfig);
+            ['attribute1', 'attribute2'],
+            $this->builder,
+            $this->modelConfig
+        );
         $returnsParameter->run();
 
         $query = 'select "attribute1", "attribute2"';
@@ -68,7 +75,10 @@ class ReturnsParameterTest extends TestCase
     public function produces_aggregation_query()
     {
         $returnsParameter = new ReturnsParameter(
-            ['count:attribute1', 'count:attribute2'], $this->builder, $this->modelConfig);
+            ['count:attribute1', 'count:attribute2'],
+            $this->builder,
+            $this->modelConfig
+        );
         $returnsParameter->run();
 
         $query = 'select count("attribute1") as count_attribute1, count("attribute2") as count_attribute2';

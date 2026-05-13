@@ -1,14 +1,13 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder;
+namespace PowerVending\LaravelApiQueryBuilder;
 
-use Asseco\JsonQueryBuilder\Config\ModelConfig;
-use Asseco\JsonQueryBuilder\Config\OperatorsConfig;
-use Asseco\JsonQueryBuilder\Exceptions\JsonQueryBuilderException;
-use Asseco\JsonQueryBuilder\Traits\CleansValues;
 use Illuminate\Support\Facades\Config;
+use PowerVending\LaravelApiQueryBuilder\Config\{ModelConfig, OperatorsConfig};
+use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
+use PowerVending\LaravelApiQueryBuilder\Traits\CleansValues;
 
 class CustomFieldSearchParser implements SearchParserInterface
 {
@@ -17,16 +16,21 @@ class CustomFieldSearchParser implements SearchParserInterface
     /**
      * Constant by which values will be split within a single parameter. E.g. parameter=value1;value2.
      */
-    const VALUE_SEPARATOR = ';';
+    public const VALUE_SEPARATOR = ';';
 
     public string $column;
-    private string $argument;
+
     public array  $values;
+
     public string $type;
+
     public string $operator;
 
     public string $cf_field_identificator = 'custom_field_id';
+
     public string $cf_field_value = '';
+
+    private string $argument;
 
     private ModelConfig $modelConfig;
 
@@ -35,7 +39,7 @@ class CustomFieldSearchParser implements SearchParserInterface
      * @param  OperatorsConfig  $operatorsConfig
      * @param  array  $arguments
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     public function __construct(ModelConfig $modelConfig, OperatorsConfig $operatorsConfig, array $arguments)
     {
@@ -63,7 +67,7 @@ class CustomFieldSearchParser implements SearchParserInterface
      * @param  string  $argument
      * @return string
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function parseOperator($operators, string $argument): string
     {
@@ -77,7 +81,7 @@ class CustomFieldSearchParser implements SearchParserInterface
             return $operator;
         }
 
-        throw new JsonQueryBuilderException("No valid callback registered for $argument. Are you missing an operator?");
+        throw new ApiQueryBuilderException("No valid callback registered for $argument. Are you missing an operator?");
     }
 
     /**
@@ -91,7 +95,7 @@ class CustomFieldSearchParser implements SearchParserInterface
      * @param  string  $values
      * @return array
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function splitValues(string $values): array
     {
@@ -99,7 +103,7 @@ class CustomFieldSearchParser implements SearchParserInterface
         $cleanedUpValues = $this->cleanValues($valueArray);
 
         if (count($cleanedUpValues) < 1) {
-            throw new JsonQueryBuilderException("Column '$this->column' is missing a value.");
+            throw new ApiQueryBuilderException("Column '$this->column' is missing a value.");
         }
 
         return $cleanedUpValues;
@@ -108,10 +112,16 @@ class CustomFieldSearchParser implements SearchParserInterface
     /**
      * @return string
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function getColumnType(): string
     {
+        $castType = $this->modelConfig->getTypeFromCast($this->column);
+
+        if ($castType !== null) {
+            return $castType;
+        }
+
         $columns = $this->modelConfig->getModelColumns();
 
         if (!array_key_exists($this->column, $columns)) {
@@ -125,15 +135,15 @@ class CustomFieldSearchParser implements SearchParserInterface
     /**
      * Check if global forbidden key is used.
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function checkForForbiddenColumns()
     {
-        $forbiddenKeys = Config::get('asseco-json-query-builder.global_forbidden_columns');
+        $forbiddenKeys = Config::get('api-query-builder.global_forbidden_columns');
         $forbiddenKeys = $this->modelConfig->getForbidden($forbiddenKeys);
 
         if (in_array($this->column, $forbiddenKeys)) {
-            throw new JsonQueryBuilderException("Searching by '$this->column' field is forbidden. Check the configuration if this is not a desirable behavior.");
+            throw new ApiQueryBuilderException("Searching by '$this->column' field is forbidden. Check the configuration if this is not a desirable behavior.");
         }
     }
 }

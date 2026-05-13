@@ -1,27 +1,27 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\SearchCallbacks;
+namespace PowerVending\LaravelApiQueryBuilder\SearchCallbacks;
 
-use Asseco\JsonQueryBuilder\CategorizedValues;
-use Asseco\JsonQueryBuilder\CustomFieldSearchParser;
-use Asseco\JsonQueryBuilder\Exceptions\JsonQueryBuilderException;
-use Asseco\JsonQueryBuilder\SearchParserInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PDO;
+use PowerVending\LaravelApiQueryBuilder\{CategorizedValues, CustomFieldSearchParser, SearchParserInterface};
+use PowerVending\LaravelApiQueryBuilder\Exceptions\{ApiQueryBuilderException, InvalidOperatorUsageException};
 
 abstract class AbstractCallback
 {
-    protected Builder $builder;
-    protected SearchParserInterface $searchParser;
-    protected CategorizedValues $categorizedValues;
-
     protected const DATE_FIELDS = [
         'date',
     ];
+
+    protected Builder $builder;
+
+    protected SearchParserInterface $searchParser;
+
+    protected CategorizedValues $categorizedValues;
 
     /**
      * AbstractCallback constructor.
@@ -29,7 +29,7 @@ abstract class AbstractCallback
      * @param  Builder  $builder
      * @param  SearchParserInterface  $searchParser
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     public function __construct(Builder $builder, SearchParserInterface $searchParser)
     {
@@ -66,13 +66,37 @@ abstract class AbstractCallback
     abstract public static function operator(): string;
 
     /**
+     * Whether this operator can be used on text-type columns (string, varchar, text, etc.).
+     */
+    public static function supportsTextTypes(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Whether this operator can be used on comparable columns (numeric, date, boolean, etc.).
+     */
+    public static function supportsComparableTypes(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Whether this operator can be used on JSON columns.
+     */
+    public static function supportsJsonTypes(): bool
+    {
+        return false;
+    }
+
+    /**
      * Execute a callback on a given column, providing the array of values.
      *
      * @param  Builder  $builder
      * @param  string  $column
      * @param  CategorizedValues  $values
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     abstract public function execute(Builder $builder, string $column, CategorizedValues $values): void;
 
@@ -99,18 +123,18 @@ abstract class AbstractCallback
      * @param  CategorizedValues  $values
      * @param  string  $operator
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function lessOrMoreCallback(Builder $builder, string $column, CategorizedValues $values, string $operator)
     {
         $this->checkAllowedValues($values, $operator);
 
         if (count($values->and) > 1) {
-            throw new JsonQueryBuilderException("Using $operator operator assumes one parameter only. Remove excess parameters.");
+            throw new InvalidOperatorUsageException("The '$operator' operator expects exactly one value, but multiple were provided.");
         }
 
         if (!$values->and) {
-            throw new JsonQueryBuilderException("No valid arguments for '$operator' operator.");
+            throw new InvalidOperatorUsageException("No value was provided for the '$operator' operator.");
         }
 
         $method = $this->isDate($this->searchParser->type) ? 'whereDate' : 'where';
@@ -123,14 +147,14 @@ abstract class AbstractCallback
      * @param  CategorizedValues  $values
      * @param  string  $operator
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function betweenCallback(Builder $builder, string $column, CategorizedValues $values, string $operator)
     {
         $this->checkAllowedValues($values, $operator);
 
         if (count($values->and) != 2) {
-            throw new JsonQueryBuilderException("Using $operator operator assumes exactly 2 parameters. Wrong number of parameters provided.");
+            throw new InvalidOperatorUsageException("The '$operator' operator expects exactly 2 values, but " . count($values->and) . " were provided.");
         }
 
         $callback = $operator == '<>' ? 'whereBetween' : 'whereNotBetween';
@@ -144,17 +168,21 @@ abstract class AbstractCallback
      * @param  CategorizedValues  $values
      * @param  string  $operator
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function containsCallback(Builder $builder, string $column, CategorizedValues $values, string $operator)
     {
         if ($values->andLike) {
             $builder->where($column, $this->getLikeOperator(), '%' . $values->andLike[0] . '%');
         }
+
         if ($values->and) {
-            foreach ($values->and as $andValue) {
-                $builder->orWhere($column, $this->getLikeOperator(), '%' . $andValue . '%');
-            }
+            $builder->where(function (Builder $q) use ($column, $values) {
+                foreach (array_values($values->and) as $i => $andValue) {
+                    $method = $i === 0 ? 'where' : 'orWhere';
+                    $q->{$method}($column, $this->getLikeOperator(), '%' . $andValue . '%');
+                }
+            });
         }
     }
 
@@ -164,17 +192,21 @@ abstract class AbstractCallback
      * @param  CategorizedValues  $values
      * @param  string  $operator
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function endsWithCallback(Builder $builder, string $column, CategorizedValues $values, string $operator)
     {
         if ($values->andLike) {
             $builder->where($column, $this->getLikeOperator(), '%' . $values->andLike[0]);
         }
+
         if ($values->and) {
-            foreach ($values->and as $andValue) {
-                $builder->orWhere($column, $this->getLikeOperator(), '%' . $andValue);
-            }
+            $builder->where(function (Builder $q) use ($column, $values) {
+                foreach (array_values($values->and) as $i => $andValue) {
+                    $method = $i === 0 ? 'where' : 'orWhere';
+                    $q->{$method}($column, $this->getLikeOperator(), '%' . $andValue);
+                }
+            });
         }
     }
 
@@ -184,17 +216,21 @@ abstract class AbstractCallback
      * @param  CategorizedValues  $values
      * @param  string  $operator
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function startsWithCallback(Builder $builder, string $column, CategorizedValues $values, string $operator)
     {
         if ($values->andLike) {
             $builder->where($column, $this->getLikeOperator(), $values->andLike[0] . '%');
         }
+
         if ($values->and) {
-            foreach ($values->and as $andValue) {
-                $builder->orWhere($column, $this->getLikeOperator(), $andValue . '%');
-            }
+            $builder->where(function (Builder $q) use ($column, $values) {
+                foreach (array_values($values->and) as $i => $andValue) {
+                    $method = $i === 0 ? 'where' : 'orWhere';
+                    $q->{$method}($column, $this->getLikeOperator(), $andValue . '%');
+                }
+            });
         }
     }
 
@@ -204,12 +240,12 @@ abstract class AbstractCallback
      * @param  CategorizedValues  $values
      * @param  string  $operator
      *
-     * @throws JsonQueryBuilderException
+     * @throws ApiQueryBuilderException
      */
     protected function checkAllowedValues(CategorizedValues $values, string $operator): void
     {
         if ($values->null || $values->notNull || $values->not || $values->notLike || $values->andLike) {
-            throw new JsonQueryBuilderException("Wrong parameter type(s) for '$operator' operator.");
+            throw new InvalidOperatorUsageException("The '$operator' operator is not supported for text-type fields. Only comparable field types (numeric, date, etc.) are allowed.");
         }
     }
 

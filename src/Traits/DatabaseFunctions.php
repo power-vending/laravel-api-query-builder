@@ -1,15 +1,15 @@
 <?php
 
-namespace Asseco\JsonQueryBuilder\Traits;
+namespace PowerVending\LaravelApiQueryBuilder\Traits;
 
-use Asseco\JsonQueryBuilder\SQLProviders\PgSQLFunctions;
-use Asseco\JsonQueryBuilder\SQLProviders\SQLFunctions;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use PowerVending\LaravelApiQueryBuilder\SQLProviders\{PgSQLFunctions, SQLFunctions};
 
 trait DatabaseFunctions
 {
     public Builder $builder;
+
     public $alias;
 
     protected array $providers = [
@@ -19,6 +19,7 @@ trait DatabaseFunctions
     protected function areArgumentsValid(): void
     {
         parent::areArgumentsValid();
+
         foreach ($this->arguments as $argument) {
             SQLFunctions::validateArgument($argument);
         }
@@ -29,6 +30,7 @@ trait DatabaseFunctions
         $column = array_pop($params);
         $provider = $this->builder->getModel()->connection ?? config('database.default');
         $functions = $this->providers[$provider] ?? SQLFunctions::class;
+
         if (strpos($column, " as ")) {
             [$column, $this->alias] = explode(" as ", $column);
         }
@@ -51,7 +53,9 @@ trait DatabaseFunctions
             $split = explode(':', $argument);
             $apply = $this->applyAggregation($split);
 
-            if(last($split) === '*') array_pop($split);
+            if (last($split) === '*') {
+                array_pop($split);
+            }
             $alias = $this->alias ?? join('_', $split);
             return DB::raw("{$apply} as {$alias}");
         }, $this->arguments);

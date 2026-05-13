@@ -1,13 +1,13 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\Tests\Unit\Config;
+namespace PowerVending\LaravelApiQueryBuilder\Tests\Unit\Config;
 
-use Asseco\JsonQueryBuilder\Config\OperatorsConfig;
-use Asseco\JsonQueryBuilder\SearchCallbacks\Equals;
-use Asseco\JsonQueryBuilder\Tests\TestCase;
 use Exception;
+use PowerVending\LaravelApiQueryBuilder\Config\OperatorsConfig;
+use PowerVending\LaravelApiQueryBuilder\SearchCallbacks\Equals;
+use PowerVending\LaravelApiQueryBuilder\Tests\TestCase;
 
 class OperatorsConfigTest extends TestCase
 {
@@ -24,7 +24,7 @@ class OperatorsConfigTest extends TestCase
     {
         $this->expectException(Exception::class);
 
-        config(['asseco-json-query-builder' => []]);
+        config(['api-query-builder' => []]);
 
         new OperatorsConfig();
     }
@@ -34,7 +34,7 @@ class OperatorsConfigTest extends TestCase
     {
         $operatorsConfig = new OperatorsConfig();
 
-        $expected = ['!<>', '<=', '>=', '<>', '!=', '=', '<', '>', 'contains', 'starts_with', 'ends_with'];
+        $expected = ['STARTS_WITH:', 'JSON_SEARCH:', 'ENDS_WITH:', 'LIKE:', 'NE:', 'NB:', 'LE:', 'GE:', 'BT:', 'EQ:', 'LT:', 'GT:'];
 
         $this->assertEquals($expected, $operatorsConfig->getOperators());
     }
@@ -44,7 +44,7 @@ class OperatorsConfigTest extends TestCase
     {
         $operatorsConfig = new OperatorsConfig();
 
-        $this->assertEquals(Equals::class, $operatorsConfig->getCallbackClassFromOperator('='));
+        $this->assertEquals(Equals::class, $operatorsConfig->getCallbackClassFromOperator('EQ:'));
     }
 
     /** @test */

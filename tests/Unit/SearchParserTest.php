@@ -1,14 +1,13 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\Tests\Unit\Parsers;
+namespace PowerVending\LaravelApiQueryBuilder\Tests\Unit\Parsers;
 
-use Asseco\JsonQueryBuilder\Config\ModelConfig;
-use Asseco\JsonQueryBuilder\Config\OperatorsConfig;
-use Asseco\JsonQueryBuilder\SearchParser;
-use Asseco\JsonQueryBuilder\Tests\TestCase;
 use Mockery;
+use PowerVending\LaravelApiQueryBuilder\Config\{ModelConfig, OperatorsConfig};
+use PowerVending\LaravelApiQueryBuilder\SearchParser;
+use PowerVending\LaravelApiQueryBuilder\Tests\TestCase;
 
 class SearchParserTest extends TestCase
 {
@@ -24,10 +23,15 @@ class SearchParserTest extends TestCase
         $modelConfig->shouldReceive('getModelColumns')->andReturn([
             'test' => 'string',
         ]);
+        $modelConfig->shouldReceive('getTypeFromCast')->andReturn(null);
         $modelConfig->shouldReceive('isPrimaryKey')->andReturn(false);
 
         $this->searchParser = new SearchParser(
-            $modelConfig, new OperatorsConfig(), 'test', '=123;456');
+            $modelConfig,
+            new OperatorsConfig(),
+            'test',
+            'EQ:123;456'
+        );
     }
 
     /** @test */
@@ -51,6 +55,28 @@ class SearchParserTest extends TestCase
     /** @test */
     public function it_extracts_operator_from_argument()
     {
-        $this->assertEquals('=', $this->searchParser->operator);
+        $this->assertEquals('EQ:', $this->searchParser->operator);
+    }
+
+    /** @test */
+    public function it_prioritizes_type_from_cast_over_schema_column_type()
+    {
+        $modelConfig = Mockery::mock(ModelConfig::class);
+
+        $modelConfig->shouldReceive('getForbidden')->andReturn([]);
+        $modelConfig->shouldReceive('getModelColumns')->andReturn([
+            'value' => 'longtext',
+        ]);
+        $modelConfig->shouldReceive('getTypeFromCast')->with('value')->andReturn('json');
+        $modelConfig->shouldReceive('isPrimaryKey')->andReturn(false);
+
+        $searchParser = new SearchParser(
+            $modelConfig,
+            new OperatorsConfig(),
+            'value',
+            'EQ:{"enabled":true}'
+        );
+
+        $this->assertEquals('json', $searchParser->type);
     }
 }

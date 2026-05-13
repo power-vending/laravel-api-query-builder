@@ -1,19 +1,21 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
-namespace Asseco\JsonQueryBuilder\Tests\Unit\RequestParameters;
+namespace PowerVending\LaravelApiQueryBuilder\Tests\Unit\RequestParameters;
 
-use Asseco\JsonQueryBuilder\Config\ModelConfig;
-use Asseco\JsonQueryBuilder\RequestParameters\OrderByParameter;
-use Asseco\JsonQueryBuilder\Tests\TestCase;
 use Exception;
 use Illuminate\Database\Eloquent\Builder;
 use Mockery;
+use PowerVending\LaravelApiQueryBuilder\Config\ModelConfig;
+use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
+use PowerVending\LaravelApiQueryBuilder\RequestParameters\OrderByParameter;
+use PowerVending\LaravelApiQueryBuilder\Tests\TestCase;
 
 class OrderByParameterTest extends TestCase
 {
     protected Builder $builder;
+
     protected ModelConfig $modelConfig;
 
     public function setUp(): void
@@ -37,7 +39,10 @@ class OrderByParameterTest extends TestCase
     public function accepts_valid_arguments()
     {
         $orderByParameter = new OrderByParameter(
-            ['attribute1', 'attribute2' => 'desc'], $this->builder, $this->modelConfig);
+            ['attribute1', 'attribute2' => 'desc'],
+            $this->builder,
+            $this->modelConfig
+        );
         $orderByParameter->run();
 
         $this->assertTrue(true);
@@ -56,7 +61,10 @@ class OrderByParameterTest extends TestCase
     public function produces_query()
     {
         $orderByParameter = new OrderByParameter(
-            ['attribute1', 'attribute2' => 'desc'], $this->builder, $this->modelConfig);
+            ['attribute1', 'attribute2' => 'desc'],
+            $this->builder,
+            $this->modelConfig
+        );
         $orderByParameter->run();
 
         $query = 'select * order by "attribute1" asc, "attribute2" desc';
@@ -68,11 +76,79 @@ class OrderByParameterTest extends TestCase
     public function produces_query_2()
     {
         $orderByParameter = new OrderByParameter(
-            ['attribute1' => 'desc', 'attribute2' => 'asc'], $this->builder, $this->modelConfig);
+            ['attribute1' => 'desc', 'attribute2' => 'asc'],
+            $this->builder,
+            $this->modelConfig
+        );
         $orderByParameter->run();
 
         $query = 'select * order by "attribute1" desc, "attribute2" asc';
 
         $this->assertEquals($query, $this->builder->toSql());
+    }
+
+    /** @test */
+    public function produces_query_with_relation()
+    {
+        // Create a TestModel instance with a BelongsTo relationship
+        $model = new \PowerVending\LaravelApiQueryBuilder\Tests\TestModel();
+        $builder = $model->newQuery();
+        $modelConfig = new ModelConfig($model);
+
+        $orderByParameter = new OrderByParameter(
+            ['related.name' => 'desc'],
+            $builder,
+            $modelConfig
+        );
+        $orderByParameter->run();
+
+        $sql = $builder->toSql();
+
+        // Check if it contains a LEFT JOIN
+        $this->assertStringContainsString('left join', $sql);
+        $this->assertStringContainsString('"related"', $sql);
+        $this->assertStringContainsString('order by', $sql);
+    }
+
+    /** @test */
+    public function produces_query_with_deep_relation()
+    {
+        // related.nested.name => should produce chained LEFT JOINs and order by nested.name
+        $model = new \PowerVending\LaravelApiQueryBuilder\Tests\TestModel();
+        $builder = $model->newQuery();
+        $modelConfig = new ModelConfig($model);
+
+        $orderByParameter = new OrderByParameter(
+            ['related.nested.name' => 'asc'],
+            $builder,
+            $modelConfig
+        );
+        $orderByParameter->run();
+
+        $sql = $builder->toSql();
+
+        // Should contain joins for both tables
+        $this->assertStringContainsString('left join', $sql);
+        $this->assertStringContainsString('"related"', $sql);
+        $this->assertStringContainsString('"nested"', $sql);
+
+        // Should order by the last relation table column
+        $this->assertStringContainsString('order by "nested"."name" asc', $sql);
+    }
+
+    /** @test */
+    public function throws_package_exception_when_relation_does_not_exist()
+    {
+        $this->expectException(ApiQueryBuilderException::class);
+
+        $model = new \PowerVending\LaravelApiQueryBuilder\Tests\TestModel();
+        $builder = $model->newQuery();
+        $modelConfig = new ModelConfig($model);
+
+        (new OrderByParameter(
+            ['doesNotExist.name' => 'asc'],
+            $builder,
+            $modelConfig
+        ))->run();
     }
 }

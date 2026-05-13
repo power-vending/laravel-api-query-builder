@@ -1,14 +1,22 @@
 {
-    "name": "nealarec/laravel-json-query-builder",
-    "description": "Laravel JSON query builder",
+    "name": "powervending/laravel-api-query-builder",
+    "description": "Laravel API query builder - forked and customized from nealarec/laravel-json-query-builder",
     "keywords": [
         "php",
-        "laravel"
+        "laravel",
+        "query-builder",
+        "api",
+        "json",
+        "power-vending"
     ],
-    "scripts": {
-        "test": "vendor/bin/phpunit"
-    },
+    "type": "library",
     "license": "MIT",
+    "authors": [
+        {
+            "name": "Power Vending",
+            "email": "dev@powervending.com"
+        }
+    ],
     "require": {
         "php": "^8.0",
         "doctrine/dbal": "^3.0|^4.0",
@@ -22,19 +30,24 @@
     },
     "autoload": {
         "psr-4": {
-            "Asseco\\JsonQueryBuilder\\": "src/"
+            "PowerVending\\LaravelApiQueryBuilder\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Asseco\\JsonQueryBuilder\\Tests\\": "tests/"
+            "PowerVending\\LaravelApiQueryBuilder\\Tests\\": "tests/"
         }
     },
     "extra": {
         "laravel": {
             "providers": [
-                "Asseco\\JsonQueryBuilder\\JsonQueryServiceProvider"
+                "PowerVending\\LaravelApiQueryBuilder\\ApiQueryServiceProvider"
             ]
         }
-    }
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
 }
