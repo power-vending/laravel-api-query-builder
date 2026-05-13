@@ -383,6 +383,62 @@ Exemplo resumido de resposta:
 }
 ```
 
+### Relacionamentos polimórficos
+
+Relacionamentos polimórficos criados com `morphTo()` não definem um modelo de destino fixo, o que impede o schema de resolver corretamente os campos e relacionamentos do lado polimórfico.
+
+```php
+// Exemplo típico — o schema NÃO consegue introspeccionar o modelo de destino
+public function requester(): MorphTo
+{
+    return $this->morphTo();
+}
+```
+
+Para que o schema consiga carregar os metadados corretamente, é recomendado (opcional) criar relacionamentos auxiliares tipados com `belongsTo`, um por cada modelo de destino possível. Cada relacionamento deve filtrar pelo campo `*_type` correspondente:
+
+```php
+// Relacionamentos auxiliares tipados — o schema resolve cada modelo corretamente
+public function requesterUser(): BelongsTo
+{
+    return $this->belongsTo(User::class, 'requester_id')
+        ->where('requester_type', User::class);
+}
+
+public function requesterOperator(): BelongsTo
+{
+    return $this->belongsTo(Operator::class, 'requester_id')
+        ->where('requester_type', Operator::class);
+}
+```
+
+Com isso, ao solicitar o schema, você pode referenciar cada variação diretamente:
+
+```http
+GET /api-query-builder/tickets/schema?relations[]=requester_user&relations[]=requester_operator
+```
+
+E o retorno trará os campos de cada modelo destino de forma independente:
+
+```json
+{
+    "relations": {
+        "requester_user": {
+            "model": "App\\Models\\User",
+            "table": "users",
+            "relations": {}
+        },
+        "requester_operator": {
+            "model": "App\\Models\\Operator",
+            "table": "operators",
+            "relations": {}
+        }
+    }
+}
+```
+
+> **Nota:** O relacionamento `morphTo()` original pode ser mantido no model normalmente — os relacionamentos auxiliares são apenas para uso com o schema e não interferem no comportamento padrão do Eloquent.
+
 ---
 
 ## Operadores de busca
@@ -2257,6 +2313,62 @@ public function index(Request $request)
 ## Erros retornados pela API
 
 Quando uma requisição contém parâmetros inválidos, o pacote lança exceções que podem ser mapeadas para respostas HTTP 400. Esta seção descreve cada mensagem de erro, sua causa e como corrigi-la.
+
+---
+
+### `Relation '<RELATION>' does not exist on model '<MODEL_CLASS>'.`
+
+**Exceção:** `InvalidRelationException`
+
+**Causa:** Foi informado um relacionamento que não existe no model (ou em algum nível de relacionamento aninhado).
+
+**Situações em que pode ocorrer:**
+
+1. No parâmetro `relations`.
+2. No parâmetro `search` quando a chave representa relacionamento (ex.: sub-search em objeto ou notação com ponto como `relation.column`).
+3. No parâmetro `doesnt_have_relations`.
+
+**Exemplos que causam o erro:**
+
+```json
+{
+    "relations": ["unknown_relation"]
+}
+```
+
+```json
+{
+    "search": {
+        "unknown_relation": {
+            "search": {
+                "id": "EQ:1"
+            }
+        }
+    }
+}
+```
+
+```json
+{
+    "search": {
+        "unknown_relation.description": "EQ:abc"
+    }
+}
+```
+
+```json
+{
+    "doesnt_have_relations": ["unknown_relation"]
+}
+```
+
+**Solução:**
+
+1. Verifique o nome da relação no model Eloquent e use o nome correto.
+2. Em relações aninhadas, valide cada segmento do caminho (ex.: `orders.items.product`).
+3. Se necessário, padronize o nome enviado pelo frontend para o método real da relação no backend.
+
+---
 
 Os erros abaixo são produzidos pela classe `InvalidOperatorUsageException` e **a mensagem é segura para ser exibida diretamente ao consumidor da API**.
 
