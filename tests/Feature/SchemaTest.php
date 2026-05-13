@@ -29,11 +29,27 @@ class SchemaTest extends TestCase
             TestModel::class => [
                 'relations' => ['related.nested'],
             ],
+            \PowerVending\LaravelApiQueryBuilder\Tests\CompanyModel::class => [
+                'relations' => ['address'],
+            ],
         ]]);
 
+        Schema::dropIfExists('company_addresses');
+        Schema::dropIfExists('companies');
         Schema::dropIfExists('nested');
         Schema::dropIfExists('related');
         Schema::dropIfExists('test');
+
+        Schema::create('company_addresses', function (Blueprint $table) {
+            $table->increments('id');
+            $table->string('street')->nullable();
+        });
+
+        Schema::create('companies', function (Blueprint $table) {
+            $table->increments('id');
+            $table->unsignedInteger('address_id')->nullable();
+            $table->string('name')->nullable();
+        });
 
         Schema::create('nested', function (Blueprint $table) {
             $table->increments('id');
@@ -49,6 +65,7 @@ class SchemaTest extends TestCase
         Schema::create('test', function (Blueprint $table) {
             $table->increments('id');
             $table->unsignedInteger('related_id')->nullable();
+            $table->unsignedInteger('company_id')->nullable();
             $table->string('serial_number')->nullable();
             $table->json('meta')->nullable();
             $table->boolean('is_enabled')->default(true);
@@ -61,6 +78,8 @@ class SchemaTest extends TestCase
         Schema::dropIfExists('test');
         Schema::dropIfExists('related');
         Schema::dropIfExists('nested');
+        Schema::dropIfExists('companies');
+        Schema::dropIfExists('company_addresses');
 
         parent::tearDown();
     }
@@ -137,7 +156,7 @@ class SchemaTest extends TestCase
     }
 
     /** @test */
-    public function uses_relations_query_param_to_override_configured_relations()
+    public function merges_relations_query_param_with_configured_relations()
     {
         $response = $this->getJson('/api-query-builder/tests/schema?relations[]=related');
         $response->assertOk();
@@ -146,7 +165,21 @@ class SchemaTest extends TestCase
         $this->assertIsArray($payload);
 
         $this->assertArrayHasKey('related', $payload['relations']);
-        $this->assertSame([], $payload['relations']['related']['relations']);
+        $this->assertArrayHasKey('nested', $payload['relations']['related']['relations']);
+    }
+
+    /** @test */
+    public function expands_requested_relation_with_all_configured_descendants_of_related_model()
+    {
+        $response = $this->getJson('/api-query-builder/tests/schema?relations[]=company');
+        $response->assertOk();
+
+        $payload = $response->json();
+        $this->assertIsArray($payload);
+
+        $this->assertArrayHasKey('related', $payload['relations']);
+        $this->assertArrayHasKey('company', $payload['relations']);
+        $this->assertArrayHasKey('address', $payload['relations']['company']['relations']);
     }
 
     private function getSchemaPayload(): array
