@@ -13,6 +13,41 @@ class NestedModel extends Model
     protected $table = 'nested';
 }
 
+class CompanyAddressModel extends Model
+{
+    protected $table = 'company_addresses';
+}
+
+class UserProfileModel extends Model
+{
+    protected $table = 'user_profiles';
+}
+
+class UserModel extends Model
+{
+    protected $table = 'users';
+
+    public function profile()
+    {
+        return $this->belongsTo(UserProfileModel::class, 'profile_id', 'id');
+    }
+}
+
+class CompanyModel extends Model
+{
+    protected $table = 'companies';
+
+    public function address()
+    {
+        return $this->belongsTo(CompanyAddressModel::class, 'address_id', 'id');
+    }
+
+    public function users()
+    {
+        return $this->hasMany(UserModel::class, 'company_id', 'id');
+    }
+}
+
 class RelatedModel extends Model
 {
     protected $table = 'related';
@@ -35,5 +70,10 @@ class TestModel extends Model
     public function related()
     {
         return $this->belongsTo(RelatedModel::class, 'related_id', 'id');
+    }
+
+    public function company()
+    {
+        return $this->belongsTo(CompanyModel::class, 'company_id', 'id');
     }
 }
