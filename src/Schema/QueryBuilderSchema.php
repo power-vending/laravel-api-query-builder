@@ -203,10 +203,22 @@ class QueryBuilderSchema
 
     private static function getOperatorsForType(string $type): array
     {
-        $operators_config = new OperatorsConfig();
-
         $normalized_type = strtolower(trim($type));
         $normalized_type = preg_replace('/\(.*\)$/', '', $normalized_type) ?? $normalized_type;
+
+        $cast_operators = Config::get('api-query-builder.cast_operators', []);
+
+        if (array_key_exists($normalized_type, $cast_operators)) {
+            $result = array_map(
+                fn ($class) => rtrim($class::operator(), ':'),
+                $cast_operators[$normalized_type]
+            );
+            sort($result);
+
+            return $result;
+        }
+
+        $operators_config = new OperatorsConfig();
 
         $is_text = in_array($normalized_type, CategorizedValues::STRING_TYPES, true);
         $is_json = in_array($normalized_type, ['json', 'jsonb'], true);

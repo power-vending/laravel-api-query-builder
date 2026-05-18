@@ -14,10 +14,10 @@
 10. [Trabalhando com relacionamentos](#trabalhando-com-relacionamentos)
 11. [Exemplos práticos completos](#exemplos-práticos-completos)
 12. [Customizações avançadas](#customizações-avançadas)
+    - [Operadores por cast (cast_operators)](#operadores-por-cast-cast_operators)
 13. [Erros retornados pela API](#erros-retornados-pela-api)
 14. [Solução de problemas](#solução-de-problemas)
 15. [Testes](#testes)
-16. [Créditos e licença](#créditos-e-licença)
 
 ---
 
@@ -2315,6 +2315,115 @@ public function index(Request $request)
 }
 ```
 
+### Operadores por cast (`cast_operators`)
+
+A chave `cast_operators` no arquivo `config/api-query-builder.php` permite restringir quais operadores estão disponíveis para campos cujo tipo é determinado pelo **cast do model**. Se um cast for mapeado aqui, apenas os operadores listados serão aceitos para campos com esse cast — tanto na rota de schema quanto na validação da query.
+
+Quando um cast **não** estiver mapeado em `cast_operators`, o fluxo normal de resolução por tipo de coluna é mantido (sem restrição adicional).
+
+#### Configuração
+
+Abra `config/api-query-builder.php` e adicione a chave `cast_operators`:
+
+```php
+use PowerVending\LaravelApiQueryBuilder\SearchCallbacks\{
+    Between,
+    Equals,
+    GreaterThan,
+    GreaterThanOrEqual,
+    LessThan,
+    LessThanOrEqual,
+    NotBetween,
+    NotEquals,
+};
+
+return [
+    // ...
+
+    'cast_operators' => [
+        'integer' => [
+            Equals::class,
+            NotEquals::class,
+            LessThan::class,
+            LessThanOrEqual::class,
+            GreaterThan::class,
+            GreaterThanOrEqual::class,
+            Between::class,
+            NotBetween::class,
+        ],
+        'boolean' => [
+            Equals::class,
+        ],
+    ],
+];
+```
+
+Os nomes das chaves devem corresponder aos tipos de cast do Laravel (ex.: `'integer'`, `'boolean'`, `'string'`, `'float'`, `'date'`).
+
+#### Efeito no schema
+
+A rota de schema retornará apenas os operadores configurados para o cast correspondente, em vez da lista padrão baseada no tipo da coluna:
+
+```json
+{
+    "searchable_columns": {
+        "is_active": {
+            "type": "boolean",
+            "operators": ["EQ"],
+            "nullable": false
+        },
+        "price": {
+            "type": "integer",
+            "operators": ["BT", "EQ", "GE", "GT", "LE", "LT", "NB", "NE"],
+            "nullable": false
+        }
+    }
+}
+```
+
+#### Efeito na validação de queries
+
+Se o frontend tentar usar um operador que não está na lista permitida para o cast do campo, a API retornará um erro:
+
+```json
+{"is_active": "GT:1"}
+```
+
+→ Lança `ApiQueryBuilderException`: `Operator 'GT:' is not allowed for cast type 'boolean' on column 'is_active'.`
+
+Apenas `EQ:` seria aceito para esse campo nesse exemplo.
+
+#### Exemplo completo com model
+
+**Model:**
+
+```php
+class Product extends Model
+{
+    use ApiQueryBuilder;
+
+    protected $casts = [
+        'price'     => 'integer',
+        'is_active' => 'boolean',
+        'name'      => 'string',
+    ];
+}
+```
+
+**Config:**
+
+```php
+'cast_operators' => [
+    'integer' => [Equals::class, LessThan::class, GreaterThan::class, Between::class],
+    'boolean' => [Equals::class],
+],
+```
+
+**Resultado:**
+- `price` (cast `integer`): aceita `EQ:`, `LT:`, `GT:`, `BT:` — outros operadores retornam erro
+- `is_active` (cast `boolean`): aceita apenas `EQ:`
+- `name` (cast `string`): não está mapeado em `cast_operators` — usa o fluxo normal de texto (`LIKE:`, `STARTS_WITH:`, `EQ:`, `NE:`, etc.)
+
 ---
 
 ## Erros retornados pela API
@@ -2465,6 +2574,43 @@ Se o objetivo é um intervalo, use `BT:` (between):
 ```json
 {"price": "BT:100;500"}
 ```
+
+---
+
+### `Operator '<OP>' is not allowed for cast type '<TYPE>' on column '<COLUMN>'.`
+
+**Exceção:** `ApiQueryBuilderException`
+
+**Causa:** O campo pesquisado possui um cast definido no model (`$casts`) e o operador utilizado não está na lista de operadores permitidos para esse cast em `cast_operators` no arquivo `config/api-query-builder.php`.
+
+Este erro só ocorre quando a chave `cast_operators` está configurada com ao menos um mapeamento de cast.
+
+**Exemplo que causa o erro:**
+
+Model com cast:
+```php
+protected $casts = [
+    'is_active' => 'boolean',
+];
+```
+
+Config:
+```php
+'cast_operators' => [
+    'boolean' => [\PowerVending\LaravelApiQueryBuilder\SearchCallbacks\Equals::class],
+],
+```
+
+Requisição inválida:
+```json
+{"is_active": "GT:1"}
+```
+
+**Solução:**
+
+1. Use um dos operadores permitidos para o cast do campo (consulte a rota de schema para ver quais estão disponíveis).
+2. Se o operador for necessário, adicione-o à lista de `cast_operators` para o cast correspondente no arquivo de configuração.
+3. Se não quiser restrição para esse cast, remova a entrada de `cast_operators`.
 
 ---
 

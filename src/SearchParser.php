@@ -55,6 +55,8 @@ class SearchParser implements SearchParserInterface
         $arguments = str_replace($this->operator, '', $this->argument);
         $this->values = $this->splitValues($arguments);
         $this->type = $this->getColumnType();
+
+        $this->validateOperatorForCastType();
     }
 
     /**
@@ -167,6 +169,33 @@ class SearchParser implements SearchParserInterface
         }
 
         return $columns[$this->column];
+    }
+
+    /**
+     * Validate that the parsed operator is allowed for the resolved cast type,
+     * when 'cast_operators' restricts operators for that type.
+     *
+     * @throws ApiQueryBuilderException
+     */
+    protected function validateOperatorForCastType(): void
+    {
+        $normalized_type = strtolower(trim($this->type));
+        $cast_operators = Config::get('api-query-builder.cast_operators', []);
+
+        if (!array_key_exists($normalized_type, $cast_operators)) {
+            return;
+        }
+
+        $allowed_operators = array_map(
+            fn ($class) => $class::operator(),
+            $cast_operators[$normalized_type]
+        );
+
+        if (!in_array($this->operator, $allowed_operators, true)) {
+            throw new ApiQueryBuilderException(
+                "Operator '$this->operator' is not allowed for cast type '$this->type' on column '$this->column'."
+            );
+        }
     }
 
     /**

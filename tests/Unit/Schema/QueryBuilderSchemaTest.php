@@ -7,6 +7,7 @@ namespace PowerVending\LaravelApiQueryBuilder\Tests\Unit\Schema;
 use Illuminate\Support\Facades\Schema;
 use PowerVending\LaravelApiQueryBuilder\Exceptions\InvalidRelationException;
 use PowerVending\LaravelApiQueryBuilder\Schema\QueryBuilderSchema;
+use PowerVending\LaravelApiQueryBuilder\SearchCallbacks\{Equals, GreaterThan, NotEquals};
 use PowerVending\LaravelApiQueryBuilder\Tests\{TestCase, TestModel};
 
 class QueryBuilderSchemaTest extends TestCase
@@ -81,6 +82,67 @@ class QueryBuilderSchemaTest extends TestCase
 
         $this->assertArrayHasKey('related', $schema['relations']);
         $this->assertArrayHasKey('nested', $schema['relations']['related']['relations']);
+    }
+
+    /** @test */
+    public function uses_cast_operators_when_configured_for_column_type()
+    {
+        config(['api-query-builder.cast_operators' => [
+            'integer' => [Equals::class, NotEquals::class],
+        ]]);
+
+        Schema::shouldReceive('hasTable')->andReturn(true);
+        Schema::shouldReceive('getColumns')->with('test')->andReturn([
+            ['name' => 'age', 'type' => 'integer', 'nullable' => false],
+        ]);
+
+        $schema = QueryBuilderSchema::forModel(new TestModel(), []);
+        $operators = $schema['searchable_columns']['age']['operators'];
+
+        $this->assertEquals(['EQ', 'NE'], $operators);
+        $this->assertNotContains('LT', $operators);
+        $this->assertNotContains('GT', $operators);
+        $this->assertNotContains('LIKE', $operators);
+    }
+
+    /** @test */
+    public function cast_operators_result_is_sorted_alphabetically()
+    {
+        config(['api-query-builder.cast_operators' => [
+            'integer' => [NotEquals::class, Equals::class, GreaterThan::class],
+        ]]);
+
+        Schema::shouldReceive('hasTable')->andReturn(true);
+        Schema::shouldReceive('getColumns')->with('test')->andReturn([
+            ['name' => 'score', 'type' => 'integer', 'nullable' => false],
+        ]);
+
+        $schema = QueryBuilderSchema::forModel(new TestModel(), []);
+        $operators = $schema['searchable_columns']['score']['operators'];
+
+        $this->assertEquals(['EQ', 'GT', 'NE'], $operators);
+    }
+
+    /** @test */
+    public function falls_back_to_normal_flow_when_type_not_in_cast_operators()
+    {
+        config(['api-query-builder.cast_operators' => [
+            'boolean' => [Equals::class],
+        ]]);
+
+        Schema::shouldReceive('hasTable')->andReturn(true);
+        Schema::shouldReceive('getColumns')->with('test')->andReturn([
+            ['name' => 'age', 'type' => 'integer', 'nullable' => false],
+        ]);
+
+        $schema = QueryBuilderSchema::forModel(new TestModel(), []);
+        $operators = $schema['searchable_columns']['age']['operators'];
+
+        // Normal comparable-type flow for integer
+        $this->assertContains('EQ', $operators);
+        $this->assertContains('LT', $operators);
+        $this->assertContains('GT', $operators);
+        $this->assertNotContains('LIKE', $operators);
     }
 
     /** @test */
