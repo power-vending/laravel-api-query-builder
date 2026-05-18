@@ -12,6 +12,7 @@ use Illuminate\Support\Str;
 use PowerVending\LaravelApiQueryBuilder\Exceptions\InvalidRelationException;
 use PowerVending\LaravelApiQueryBuilder\Http\Requests\SchemaRequest;
 use PowerVending\LaravelApiQueryBuilder\Schema\QueryBuilderSchema;
+use PowerVending\LaravelApiQueryBuilder\Support\AllowedRelationModel;
 use PowerVending\LaravelApiQueryBuilder\Support\RelationMethodNormalizer;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -80,7 +81,7 @@ class SchemaController
             try {
                 $return_value = $model->{$method->getName()}();
 
-                if ($return_value instanceof Relation) {
+                if ($return_value instanceof Relation && AllowedRelationModel::isAllowed($return_value->getRelated())) {
                     $relations[] = Str::snake($method->getName());
                 }
             } catch (\Throwable) {
@@ -155,7 +156,13 @@ class SchemaController
                 return null;
             }
 
-            $current_model = $relation->getRelated();
+            $related_model = $relation->getRelated();
+
+            if (!AllowedRelationModel::isAllowed($related_model)) {
+                return null;
+            }
+
+            $current_model = $related_model;
         }
 
         return $current_model;

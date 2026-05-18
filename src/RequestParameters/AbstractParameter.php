@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use PowerVending\LaravelApiQueryBuilder\Config\ModelConfig;
 use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
 use PowerVending\LaravelApiQueryBuilder\Exceptions\InvalidRelationException;
+use PowerVending\LaravelApiQueryBuilder\Support\AllowedRelationModel;
 use PowerVending\LaravelApiQueryBuilder\Support\RelationMethodNormalizer;
 
 abstract class AbstractParameter
@@ -118,6 +119,10 @@ abstract class AbstractParameter
             return null;
         }
 
-        return $relation instanceof Relation ? $relation : null;
+        if (!$relation instanceof Relation) {
+            return null;
+        }
+
+        return AllowedRelationModel::isAllowed($relation->getRelated()) ? $relation : null;
     }
 }

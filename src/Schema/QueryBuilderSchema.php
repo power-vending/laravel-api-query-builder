@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\{Config, Schema};
 use PowerVending\LaravelApiQueryBuilder\CategorizedValues;
 use PowerVending\LaravelApiQueryBuilder\Config\{ModelConfig, OperatorsConfig};
 use PowerVending\LaravelApiQueryBuilder\Exceptions\InvalidRelationException;
+use PowerVending\LaravelApiQueryBuilder\Support\AllowedRelationModel;
 use PowerVending\LaravelApiQueryBuilder\Support\RelationMethodNormalizer;
 
 class QueryBuilderSchema
@@ -131,7 +132,13 @@ class QueryBuilderSchema
             return null;
         }
 
-        return $relation instanceof Relation ? $relation->getRelated() : null;
+        if (!$relation instanceof Relation) {
+            return null;
+        }
+
+        $related = $relation->getRelated();
+
+        return AllowedRelationModel::isAllowed($related) ? $related : null;
     }
 
     private static function getSearchableColumns(Model $model, ModelConfig $model_config): array
