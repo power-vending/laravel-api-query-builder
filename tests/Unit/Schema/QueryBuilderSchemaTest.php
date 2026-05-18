@@ -146,6 +146,29 @@ class QueryBuilderSchemaTest extends TestCase
     }
 
     /** @test */
+    public function uses_cast_operators_when_key_is_a_class_name()
+    {
+        $castClass = 'App\\Casts\\DynamicConfiguration';
+
+        config(['api-query-builder.cast_operators' => [
+            $castClass => [Equals::class, NotEquals::class],
+        ]]);
+
+        Schema::shouldReceive('hasTable')->andReturn(true);
+        Schema::shouldReceive('getColumns')->with('test')->andReturn([
+            // Type is the raw class name, as returned by getTypeFromCast() for custom casts
+            ['name' => 'config', 'type' => $castClass, 'nullable' => false],
+        ]);
+
+        $schema = QueryBuilderSchema::forModel(new TestModel(), []);
+        $operators = $schema['searchable_columns']['config']['operators'];
+
+        $this->assertEquals(['EQ', 'NE'], $operators);
+        $this->assertNotContains('LT', $operators);
+        $this->assertNotContains('LIKE', $operators);
+    }
+
+    /** @test */
     public function throws_invalid_relation_exception_when_relation_does_not_exist()
     {
         Schema::shouldReceive('hasTable')->andReturn(true);

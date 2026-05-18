@@ -121,6 +121,48 @@ class SearchParserTest extends TestCase
     }
 
     /** @test */
+    public function it_accepts_operator_allowed_when_cast_key_is_a_class_name()
+    {
+        $castClass = 'App\\Casts\\DynamicConfiguration';
+
+        config(['api-query-builder.cast_operators' => [
+            $castClass => [Equals::class],
+        ]]);
+
+        $modelConfig = Mockery::mock(ModelConfig::class);
+        $modelConfig->shouldReceive('getForbidden')->andReturn([]);
+        $modelConfig->shouldReceive('getModelColumns')->andReturn(['config' => 'longtext']);
+        $modelConfig->shouldReceive('getTypeFromCast')->with('config')->andReturn($castClass);
+        $modelConfig->shouldReceive('isPrimaryKey')->andReturn(false);
+
+        $parser = new SearchParser($modelConfig, new OperatorsConfig(), 'config', 'EQ:somevalue');
+
+        $this->assertEquals('EQ:', $parser->operator);
+        $this->assertEquals($castClass, $parser->type);
+    }
+
+    /** @test */
+    public function it_throws_when_operator_forbidden_and_cast_key_is_a_class_name()
+    {
+        $castClass = 'App\\Casts\\DynamicConfiguration';
+
+        config(['api-query-builder.cast_operators' => [
+            $castClass => [Equals::class],
+        ]]);
+
+        $modelConfig = Mockery::mock(ModelConfig::class);
+        $modelConfig->shouldReceive('getForbidden')->andReturn([]);
+        $modelConfig->shouldReceive('getModelColumns')->andReturn(['config' => 'longtext']);
+        $modelConfig->shouldReceive('getTypeFromCast')->with('config')->andReturn($castClass);
+        $modelConfig->shouldReceive('isPrimaryKey')->andReturn(false);
+
+        $this->expectException(ApiQueryBuilderException::class);
+        $this->expectExceptionMessage("Operator 'GT:' is not allowed for cast type '$castClass' on column 'config'.");
+
+        new SearchParser($modelConfig, new OperatorsConfig(), 'config', 'GT:somevalue');
+    }
+
+    /** @test */
     public function it_does_not_restrict_operators_when_cast_type_not_in_cast_operators_config()
     {
         config(['api-query-builder.cast_operators' => [

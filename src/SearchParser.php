@@ -179,16 +179,16 @@ class SearchParser implements SearchParserInterface
      */
     protected function validateOperatorForCastType(): void
     {
-        $normalized_type = strtolower(trim($this->type));
         $cast_operators = Config::get('api-query-builder.cast_operators', []);
+        $cast_key = $this->resolveCastOperatorsKey($this->type, $cast_operators);
 
-        if (!array_key_exists($normalized_type, $cast_operators)) {
+        if ($cast_key === null) {
             return;
         }
 
         $allowed_operators = array_map(
             fn ($class) => $class::operator(),
-            $cast_operators[$normalized_type]
+            $cast_operators[$cast_key]
         );
 
         if (!in_array($this->operator, $allowed_operators, true)) {
@@ -196,6 +196,24 @@ class SearchParser implements SearchParserInterface
                 "Operator '$this->operator' is not allowed for cast type '$this->type' on column '$this->column'."
             );
         }
+    }
+
+    private function resolveCastOperatorsKey(string $type, array $cast_operators): ?string
+    {
+        $raw = trim($type);
+
+        if (array_key_exists($raw, $cast_operators)) {
+            return $raw;
+        }
+
+        $normalized = strtolower($raw);
+        $normalized = preg_replace('/\(.*\)$/', '', $normalized) ?? $normalized;
+
+        if (array_key_exists($normalized, $cast_operators)) {
+            return $normalized;
+        }
+
+        return null;
     }
 
     /**

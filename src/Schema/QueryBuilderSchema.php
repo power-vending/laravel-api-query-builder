@@ -201,17 +201,36 @@ class QueryBuilderSchema
         return array_unique($forbidden);
     }
 
+    private static function resolveCastOperatorsKey(string $type, array $cast_operators): ?string
+    {
+        $raw = trim($type);
+
+        if (array_key_exists($raw, $cast_operators)) {
+            return $raw;
+        }
+
+        $normalized = strtolower($raw);
+        $normalized = preg_replace('/\(.*\)$/', '', $normalized) ?? $normalized;
+
+        if (array_key_exists($normalized, $cast_operators)) {
+            return $normalized;
+        }
+
+        return null;
+    }
+
     private static function getOperatorsForType(string $type): array
     {
         $normalized_type = strtolower(trim($type));
         $normalized_type = preg_replace('/\(.*\)$/', '', $normalized_type) ?? $normalized_type;
 
         $cast_operators = Config::get('api-query-builder.cast_operators', []);
+        $cast_key = self::resolveCastOperatorsKey($type, $cast_operators);
 
-        if (array_key_exists($normalized_type, $cast_operators)) {
+        if ($cast_key !== null) {
             $result = array_map(
                 fn ($class) => rtrim($class::operator(), ':'),
-                $cast_operators[$normalized_type]
+                $cast_operators[$cast_key]
             );
             sort($result);
 
