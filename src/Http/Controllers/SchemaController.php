@@ -34,8 +34,32 @@ class SchemaController
         $relations = $this->mergeAndExpandRelations($model, $default_relations, $requested_relations);
 
         $schema = QueryBuilderSchema::forModel($model, $relations);
+        $schema['relations'] = $this->sortRelationNodesRecursively($schema['relations'] ?? []);
 
         return response()->json($schema);
+    }
+
+    private function sortRelationNodesRecursively(array $relations): array
+    {
+        if ($relations === []) {
+            return $relations;
+        }
+
+        ksort($relations);
+
+        foreach ($relations as $relation_name => $relation_schema) {
+            if (!is_array($relation_schema)) {
+                continue;
+            }
+
+            $relation_schema['relations'] = $this->sortRelationNodesRecursively(
+                is_array($relation_schema['relations'] ?? null) ? $relation_schema['relations'] : []
+            );
+
+            $relations[$relation_name] = $relation_schema;
+        }
+
+        return $relations;
     }
 
     private function discoverModelRelations(Model $model): array
