@@ -94,11 +94,11 @@ class ModelConfig
 
     public function getForbiddenRelations(array $forbiddenRelations): array
     {
-        if (property_exists($this->model, 'forbiddenRelations')) {
+        if (property_exists($this->model, 'apiQueryBuilderForbiddenRelations')) {
             $reflection = new \ReflectionClass($this->model);
 
-            if ($reflection->hasProperty('forbiddenRelations')) {
-                $property = $reflection->getProperty('forbiddenRelations');
+            if ($reflection->hasProperty('apiQueryBuilderForbiddenRelations')) {
+                $property = $reflection->getProperty('apiQueryBuilderForbiddenRelations');
                 $modelForbiddenRelations = $property->getValue($this->model);
 
                 if (is_array($modelForbiddenRelations) && !empty($modelForbiddenRelations)) {
@@ -167,11 +167,11 @@ class ModelConfig
 
     protected function getForbiddenColumns(array $forbiddenKeys): array
     {
-        if (property_exists($this->model, 'forbiddenColumns')) {
+        if (property_exists($this->model, 'apiQueryBuilderForbiddenColumns')) {
             $reflection = new \ReflectionClass($this->model);
 
-            if ($reflection->hasProperty('forbiddenColumns')) {
-                $property = $reflection->getProperty('forbiddenColumns');
+            if ($reflection->hasProperty('apiQueryBuilderForbiddenColumns')) {
+                $property = $reflection->getProperty('apiQueryBuilderForbiddenColumns');
                 $modelForbidden = $property->getValue($this->model);
 
                 if (is_array($modelForbidden) && !empty($modelForbidden)) {
