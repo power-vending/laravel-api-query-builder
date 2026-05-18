@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use PowerVending\LaravelApiQueryBuilder\Config\ModelConfig;
 use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
 use PowerVending\LaravelApiQueryBuilder\Exceptions\InvalidRelationException;
-use PowerVending\LaravelApiQueryBuilder\Support\AllowedRelationModel;
 use PowerVending\LaravelApiQueryBuilder\Support\RelationMethodNormalizer;
 
 abstract class AbstractParameter
@@ -109,7 +108,10 @@ abstract class AbstractParameter
 
     protected function resolveRelation(Model $model, string $method): ?Relation
     {
-        if (!method_exists($model, $method)) {
+        $globalForbiddenRelations = (array) config('api-query-builder.global_forbidden_relations', []);
+        $modelConfig = new ModelConfig($model);
+
+        if ($modelConfig->isRelationForbidden($method, $globalForbiddenRelations) || !method_exists($model, $method)) {
             return null;
         }
 
@@ -119,10 +121,6 @@ abstract class AbstractParameter
             return null;
         }
 
-        if (!$relation instanceof Relation) {
-            return null;
-        }
-
-        return AllowedRelationModel::isAllowed($relation->getRelated()) ? $relation : null;
+        return $relation instanceof Relation ? $relation : null;
     }
 }

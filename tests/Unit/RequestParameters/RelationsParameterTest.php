@@ -135,4 +135,24 @@ class RelationsParameterTest extends TestCase
 
         $relationsParameter->run();
     }
+
+    /** @test */
+    public function throws_on_forbidden_relation_defined_in_model_options()
+    {
+        config(['api-query-builder.model_options' => [
+            TestModel::class => [
+                'forbidden_relations' => ['tags'],
+            ],
+        ]]);
+
+        $this->expectException(InvalidRelationException::class);
+
+        $relationsParameter = new RelationsParameter(
+            ['tags'],
+            $this->builder,
+            $this->modelConfig
+        );
+
+        $relationsParameter->run();
+    }
 }

@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\{Config, Schema};
 use PowerVending\LaravelApiQueryBuilder\CategorizedValues;
 use PowerVending\LaravelApiQueryBuilder\Config\{ModelConfig, OperatorsConfig};
 use PowerVending\LaravelApiQueryBuilder\Exceptions\InvalidRelationException;
-use PowerVending\LaravelApiQueryBuilder\Support\AllowedRelationModel;
 use PowerVending\LaravelApiQueryBuilder\Support\RelationMethodNormalizer;
 
 class QueryBuilderSchema
@@ -121,8 +120,10 @@ class QueryBuilderSchema
     private static function resolveSingleRelation(Model $model, string $segment): ?Model
     {
         $method = RelationMethodNormalizer::normalize($segment);
+        $globalForbiddenRelations = Config::get('api-query-builder.global_forbidden_relations', []);
+        $modelConfig = new ModelConfig($model);
 
-        if ($method === null || !method_exists($model, $method)) {
+        if ($method === null || $modelConfig->isRelationForbidden($method, $globalForbiddenRelations) || !method_exists($model, $method)) {
             return null;
         }
 
@@ -136,9 +137,7 @@ class QueryBuilderSchema
             return null;
         }
 
-        $related = $relation->getRelated();
-
-        return AllowedRelationModel::isAllowed($related) ? $related : null;
+        return $relation->getRelated();
     }
 
     private static function getSearchableColumns(Model $model, ModelConfig $model_config): array

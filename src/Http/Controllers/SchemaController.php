@@ -9,10 +9,10 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Str;
+use PowerVending\LaravelApiQueryBuilder\Config\ModelConfig;
 use PowerVending\LaravelApiQueryBuilder\Exceptions\InvalidRelationException;
 use PowerVending\LaravelApiQueryBuilder\Http\Requests\SchemaRequest;
 use PowerVending\LaravelApiQueryBuilder\Schema\QueryBuilderSchema;
-use PowerVending\LaravelApiQueryBuilder\Support\AllowedRelationModel;
 use PowerVending\LaravelApiQueryBuilder\Support\RelationMethodNormalizer;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -68,12 +68,15 @@ class SchemaController
     {
         $relations = [];
         $reflection = new \ReflectionClass($model);
+        $modelConfig = new ModelConfig($model);
+        $globalForbiddenRelations = Config::get('api-query-builder.global_forbidden_relations', []);
 
         foreach ($reflection->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
             if (
                 $method->isStatic()
                 || $method->getDeclaringClass()->getName() !== get_class($model)
                 || str_starts_with($method->getName(), '_')
+                || $modelConfig->isRelationForbidden($method->getName(), $globalForbiddenRelations)
             ) {
                 continue;
             }
@@ -81,7 +84,7 @@ class SchemaController
             try {
                 $return_value = $model->{$method->getName()}();
 
-                if ($return_value instanceof Relation && AllowedRelationModel::isAllowed($return_value->getRelated())) {
+                if ($return_value instanceof Relation) {
                     $relations[] = Str::snake($method->getName());
                 }
             } catch (\Throwable) {
@@ -138,11 +141,17 @@ class SchemaController
         }
 
         $current_model = $model;
+        $globalForbiddenRelations = Config::get('api-query-builder.global_forbidden_relations', []);
 
         foreach ($segments as $segment) {
             $method = RelationMethodNormalizer::normalize($segment);
+            $modelConfig = new ModelConfig($current_model);
 
-            if ($method === null || !method_exists($current_model, $method)) {
+            if (
+                $method === null
+                || $modelConfig->isRelationForbidden($method, $globalForbiddenRelations)
+                || !method_exists($current_model, $method)
+            ) {
                 return null;
             }
 
@@ -156,13 +165,7 @@ class SchemaController
                 return null;
             }
 
-            $related_model = $relation->getRelated();
-
-            if (!AllowedRelationModel::isAllowed($related_model)) {
-                return null;
-            }
-
-            $current_model = $related_model;
+            $current_model = $relation->getRelated();
         }
 
         return $current_model;

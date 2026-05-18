@@ -163,6 +163,12 @@ return [
         'password',
         'remember_token',
     ],
+
+    // Relacionamentos que nunca podem ser carregados ou expostos por schema
+    'global_forbidden_relations' => [
+        'internalRelation',
+        'company.users',
+    ],
     
     // Outras configurações...
 ];
@@ -237,6 +243,29 @@ class User extends Model
 3. `model_options[Model::class]['forbidden_columns']` (config) - sobrescreve tudo
 
 **IMPORTANTE:** As três fontes são mescladas (união). Se quiser usar apenas config, não defina `$forbiddenColumns` na model.
+
+### Configurando relacionamentos proibidos
+
+Assim como colunas, você pode bloquear relacionamentos específicos para evitar que o schema os auto-descubra ou que o frontend peça carregamento deles.
+
+```php
+'global_forbidden_relations' => [
+    'internalRelation',
+    'company.users',
+],
+```
+
+Também é possível restringir relacionamentos por model via `model_options`:
+
+```php
+'model_options' => [
+    \App\Models\User::class => [
+        'forbidden_relations' => ['profile', 'company'],
+    ],
+],
+```
+
+Relacionamentos proibidos são tratados como inexistentes: o schema não os carrega automaticamente e qualquer tentativa de requestar esses relacionamentos gera erro de relation not found.
 
 ### Passo 5: Configurar estrutura de rotas do pacote
 
