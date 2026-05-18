@@ -12,6 +12,7 @@ use Illuminate\Support\Str;
 use PowerVending\LaravelApiQueryBuilder\Exceptions\InvalidRelationException;
 use PowerVending\LaravelApiQueryBuilder\Http\Requests\SchemaRequest;
 use PowerVending\LaravelApiQueryBuilder\Schema\QueryBuilderSchema;
+use PowerVending\LaravelApiQueryBuilder\Support\RelationMethodNormalizer;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class SchemaController
@@ -134,9 +135,9 @@ class SchemaController
         $current_model = $model;
 
         foreach ($segments as $segment) {
-            $method = Str::camel($segment);
+            $method = RelationMethodNormalizer::normalize($segment);
 
-            if (!method_exists($current_model, $method)) {
+            if ($method === null || !method_exists($current_model, $method)) {
                 return null;
             }
 
