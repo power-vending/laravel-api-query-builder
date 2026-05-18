@@ -227,6 +227,25 @@ class SchemaTest extends TestCase
         $this->assertArrayHasKey('tags', $payload['relations']);
     }
 
+    /** @test */
+    public function returns_relations_in_alphabetical_order_at_every_level()
+    {
+        $response = $this->getJson('/api-query-builder/tests/schema?relations[]=company.users');
+        $response->assertOk();
+
+        $payload = $response->json();
+        $this->assertIsArray($payload);
+
+        $topLevelRelations = array_keys($payload['relations']);
+        $this->assertSame(['company', 'related', 'tags'], $topLevelRelations);
+
+        $companyRelations = array_keys($payload['relations']['company']['relations']);
+        $this->assertSame(['address', 'users'], $companyRelations);
+
+        $usersRelations = array_keys($payload['relations']['company']['relations']['users']['relations']);
+        $this->assertSame(['profile'], $usersRelations);
+    }
+
     private function getSchemaPayload(): array
     {
         $response = $this->getJson('/api-query-builder/tests/schema');
