@@ -125,7 +125,7 @@ class SchemaTest extends TestCase
         $idOperators = $payload['searchable_columns']['id']['operators'];
         $enabledOperators = $payload['searchable_columns']['is_enabled']['operators'];
 
-        $expectedComparableOperators = ['NE', 'NB', 'LE', 'GE', 'BT', 'EQ', 'LT', 'GT'];
+        $expectedComparableOperators = ['BT', 'EQ', 'GE', 'GT', 'LE', 'LT', 'NB', 'NE'];
 
         $this->assertSame($expectedComparableOperators, $idOperators);
         $this->assertSame($expectedComparableOperators, $enabledOperators);
@@ -139,7 +139,7 @@ class SchemaTest extends TestCase
         $this->assertArrayHasKey('serial_number', $payload['searchable_columns']);
 
         $serialOperators = $payload['searchable_columns']['serial_number']['operators'];
-        $expectedTextOperators = ['STARTS_WITH', 'ENDS_WITH', 'LIKE', 'NE', 'EQ'];
+        $expectedTextOperators = ['ENDS_WITH', 'EQ', 'LIKE', 'NE', 'STARTS_WITH'];
 
         $this->assertSame($expectedTextOperators, $serialOperators);
     }
@@ -152,7 +152,7 @@ class SchemaTest extends TestCase
         $this->assertArrayHasKey('meta', $payload['searchable_columns']);
 
         $metaOperators = $payload['searchable_columns']['meta']['operators'];
-        $expectedJsonOperators = ['STARTS_WITH', 'JSON_SEARCH', 'ENDS_WITH', 'LIKE', 'NE', 'EQ'];
+        $expectedJsonOperators = ['ENDS_WITH', 'EQ', 'JSON_SEARCH', 'LIKE', 'NE', 'STARTS_WITH'];
 
         $this->assertSame($expectedJsonOperators, $metaOperators);
     }

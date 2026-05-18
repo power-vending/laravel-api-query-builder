@@ -225,6 +225,8 @@ class QueryBuilderSchema
             }
         }
 
+        sort($result);
+
         return $result;
     }
 }
