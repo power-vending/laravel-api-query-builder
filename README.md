@@ -2317,7 +2317,7 @@ public function index(Request $request)
 
 ### Operadores por cast (`cast_operators`)
 
-A chave `cast_operators` no arquivo `config/api-query-builder.php` permite restringir quais operadores estão disponíveis para campos cujo tipo é determinado pelo **cast do model**. Se um cast for mapeado aqui, apenas os operadores listados serão aceitos para campos com esse cast — tanto na rota de schema quanto na validação da query.
+A chave `cast_operators` no arquivo `config/api-query-builder.php` permite restringir quais operadores estão disponíveis para campos cujo tipo é determinado pelo **cast do model**. Isso inclui casts nativos do Laravel e casts personalizados. Se um cast for mapeado aqui, apenas os operadores listados serão aceitos para campos com esse cast — tanto na rota de schema quanto na validação da query.
 
 Quando um cast **não** estiver mapeado em `cast_operators`, o fluxo normal de resolução por tipo de coluna é mantido (sem restrição adicional).
 
@@ -2358,7 +2358,7 @@ return [
 ];
 ```
 
-Os nomes das chaves devem corresponder aos tipos de cast do Laravel (ex.: `'integer'`, `'boolean'`, `'string'`, `'float'`, `'date'`).
+Os nomes das chaves devem corresponder aos tipos de cast do Laravel e também aos casts personalizados definidos no model (ex.: `'integer'`, `'boolean'`, `'string'`, `'float'`, `'date'`).
 
 #### Efeito no schema
 
@@ -2406,6 +2406,7 @@ class Product extends Model
         'price'     => 'integer',
         'is_active' => 'boolean',
         'name'      => 'string',
+        'expires_at' => \App\Casts\Iso8601DateTimeString::class,
     ];
 }
 ```
@@ -2416,6 +2417,7 @@ class Product extends Model
 'cast_operators' => [
     'integer' => [Equals::class, LessThan::class, GreaterThan::class, Between::class],
     'boolean' => [Equals::class],
+    \App\Casts\Iso8601DateTimeString::class => [Equals::class, LessThan::class, GreaterThan::class, Between::class],
 ],
 ```
 
@@ -2423,6 +2425,7 @@ class Product extends Model
 - `price` (cast `integer`): aceita `EQ:`, `LT:`, `GT:`, `BT:` — outros operadores retornam erro
 - `is_active` (cast `boolean`): aceita apenas `EQ:`
 - `name` (cast `string`): não está mapeado em `cast_operators` — usa o fluxo normal de texto (`LIKE:`, `STARTS_WITH:`, `EQ:`, `NE:`, etc.)
+- `expires_at` (cast personalizado `Iso8601DateTimeString`): aceita os operadores configurados para esse cast em `cast_operators`
 
 ---
 
