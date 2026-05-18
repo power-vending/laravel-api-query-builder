@@ -265,6 +265,26 @@ Também é possível restringir relacionamentos por model via `model_options`:
 ],
 ```
 
+Além da configuração, você também pode declarar a propriedade `$forbiddenRelations` diretamente no model:
+
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class User extends Model
+{
+    protected $forbiddenRelations = [
+        'profile',
+        'company.users',
+    ];
+}
+```
+
+As três fontes são mescladas (união): `global_forbidden_relations`, `model_options[Model::class]['forbidden_relations']` e `$forbiddenRelations`.
+
 Relacionamentos proibidos são tratados como inexistentes: o schema não os carrega automaticamente e qualquer tentativa de requestar esses relacionamentos gera erro de relation not found.
 
 ### Passo 5: Configurar estrutura de rotas do pacote
