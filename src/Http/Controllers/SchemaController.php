@@ -69,7 +69,11 @@ class SchemaController
         $reflection = new \ReflectionClass($model);
 
         foreach ($reflection->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
-            if ($method->isStatic() || $method->getDeclaringClass()->getName() !== get_class($model)) {
+            if (
+                $method->isStatic()
+                || $method->getDeclaringClass()->getName() !== get_class($model)
+                || str_starts_with($method->getName(), '_')
+            ) {
                 continue;
             }
 

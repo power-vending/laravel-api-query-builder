@@ -16,14 +16,10 @@ class RelationMethodNormalizer
             return null;
         }
 
-        $leadingUnderscoresCount = strspn($normalized, '_');
-        $prefix = substr($normalized, 0, $leadingUnderscoresCount);
-        $core = substr($normalized, $leadingUnderscoresCount);
-
-        if ($core === '') {
+        if (str_starts_with($normalized, '_')) {
             return null;
         }
 
-        return $prefix . Str::camel($core);
+        return Str::camel($normalized);
     }
 }
