@@ -163,6 +163,12 @@ return [
         'password',
         'remember_token',
     ],
+
+    // Relacionamentos que nunca podem ser carregados ou expostos por schema
+    'global_forbidden_relations' => [
+        'internalRelation',
+        'company.users',
+    ],
     
     // Outras configurações...
 ];
@@ -222,7 +228,7 @@ class User extends Model
     /**
      * Colunas que não podem ser acessadas via API query
      */
-    protected $forbiddenColumns = [
+    protected $apiQueryBuilderForbiddenColumns = [
         'password',
         'remember_token',
         'two_factor_secret',
@@ -233,10 +239,53 @@ class User extends Model
 
 **Ordem de precedência das colunas proibidas:**
 1. `global_forbidden_columns` (config) - aplica a todos os models
-2. `$forbiddenColumns` (model) - específico da model
+2. `$apiQueryBuilderForbiddenColumns` (model) - específico da model
 3. `model_options[Model::class]['forbidden_columns']` (config) - sobrescreve tudo
 
-**IMPORTANTE:** As três fontes são mescladas (união). Se quiser usar apenas config, não defina `$forbiddenColumns` na model.
+**IMPORTANTE:** As três fontes são mescladas (união). Se quiser usar apenas config, não defina `$apiQueryBuilderForbiddenColumns` na model.
+
+### Configurando relacionamentos proibidos
+
+Assim como colunas, você pode bloquear relacionamentos específicos para evitar que o schema os auto-descubra ou que o frontend peça carregamento deles.
+
+```php
+'global_forbidden_relations' => [
+    'internalRelation',
+    'company.users',
+],
+```
+
+Também é possível restringir relacionamentos por model via `model_options`:
+
+```php
+'model_options' => [
+    \App\Models\User::class => [
+        'forbidden_relations' => ['profile', 'company'],
+    ],
+],
+```
+
+Além da configuração, você também pode declarar a propriedade `$apiQueryBuilderForbiddenRelations` diretamente no model:
+
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class User extends Model
+{
+    protected $apiQueryBuilderForbiddenRelations = [
+        'profile',
+        'company.users',
+    ];
+}
+```
+
+As três fontes são mescladas (união): `global_forbidden_relations`, `model_options[Model::class]['forbidden_relations']` e `$apiQueryBuilderForbiddenRelations`.
+
+Relacionamentos proibidos são tratados como inexistentes: o schema não os carrega automaticamente e qualquer tentativa de requestar esses relacionamentos gera erro de relation not found.
 
 ### Passo 5: Configurar estrutura de rotas do pacote
 
@@ -2671,7 +2720,7 @@ O pacote irá qualificar automaticamente as colunas.
 
 **Solução:**
 
-1. Verifique a propriedade `$forbiddenColumns` na model
+1. Verifique a propriedade `$apiQueryBuilderForbiddenColumns` na model
 2. Verifique `config/api-query-builder.php` → `global_forbidden_columns`
 3. Verifique `config/api-query-builder.php` → `model_options[YourModel::class]['forbidden_columns']`
 4. Remova a coluna da lista ou use outra coluna para buscar

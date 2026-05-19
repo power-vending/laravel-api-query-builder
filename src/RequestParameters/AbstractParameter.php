@@ -7,10 +7,10 @@ namespace PowerVending\LaravelApiQueryBuilder\RequestParameters;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
-use Illuminate\Support\Str;
 use PowerVending\LaravelApiQueryBuilder\Config\ModelConfig;
 use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
 use PowerVending\LaravelApiQueryBuilder\Exceptions\InvalidRelationException;
+use PowerVending\LaravelApiQueryBuilder\Support\RelationMethodNormalizer;
 
 abstract class AbstractParameter
 {
@@ -88,13 +88,14 @@ abstract class AbstractParameter
         $normalizedSegments = [];
 
         foreach ($segments as $segment) {
-            $method = Str::camel($segment);
+            $method = RelationMethodNormalizer::normalize($segment);
+            $relation = $method === null ? 
+                null : 
+                $this->resolveRelation($currentModel, $method);
 
-            $relation = $this->resolveRelation($currentModel, $method);
-
-            if ($relation === null) {
+            if ($method === null || $relation === null) {
                 throw new InvalidRelationException(
-                    "Relation '$method' does not exist on model '" . get_class($currentModel) . "'."
+                    "Relation '$segment' does not exist on model '" . get_class($currentModel) . "'."
                 );
             }
 
@@ -107,7 +108,10 @@ abstract class AbstractParameter
 
     protected function resolveRelation(Model $model, string $method): ?Relation
     {
-        if (!method_exists($model, $method)) {
+        $globalForbiddenRelations = (array) config('api-query-builder.global_forbidden_relations', []);
+        $modelConfig = new ModelConfig($model);
+
+        if ($modelConfig->isRelationForbidden($method, $globalForbiddenRelations) || !method_exists($model, $method)) {
             return null;
         }
 

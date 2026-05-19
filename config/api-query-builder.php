@@ -119,6 +119,14 @@ return [
     ],
 
     /**
+     * List of globally forbidden relations.
+     * Forbidden relations are treated as not found and are never auto-discovered.
+     */
+    'global_forbidden_relations' => [
+        // 'company.users', 'internalRelation' ...
+    ],
+
+    /**
      * TODO: these options are currently disabled and will not work
      * Refined options for a single model.
      * Use if you want to enforce rules on a specific model without affecting globally all models.
@@ -160,6 +168,12 @@ return [
              * List of relations to load by default. These will be overridden if provided within query string.
              */
             'relations' => ['rel1', 'rel2'],
+
+            /**
+             * Relations that are forbidden for this model.
+             * Forbidden relations are treated as not found and are never auto-discovered.
+             */
+            'forbidden_relations' => ['internal_relation'],
 
             /**
              * TBD

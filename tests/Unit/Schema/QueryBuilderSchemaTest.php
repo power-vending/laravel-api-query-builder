@@ -185,4 +185,28 @@ class QueryBuilderSchemaTest extends TestCase
 
         QueryBuilderSchema::forModel(new TestModel(), ['related.invalid']);
     }
+
+    /** @test */
+    public function throws_invalid_relation_exception_when_relation_is_forbidden_by_model_options()
+    {
+        config(['api-query-builder.model_options' => [
+            TestModel::class => [
+                'forbidden_relations' => ['tags'],
+            ],
+        ]]);
+
+        Schema::shouldReceive('hasTable')->andReturn(true);
+        Schema::shouldReceive('getColumns')->andReturnUsing(function (string $table) {
+            return match ($table) {
+                'test' => [['name' => 'id', 'type' => 'int', 'nullable' => false]],
+                'related' => [['name' => 'id', 'type' => 'int', 'nullable' => false]],
+                default => [],
+            };
+        });
+
+        $this->expectException(InvalidRelationException::class);
+        $this->expectExceptionMessage("Relation 'tags' does not exist on model '");
+
+        QueryBuilderSchema::forModel(new TestModel(), ['tags']);
+    }
 }
