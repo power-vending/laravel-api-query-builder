@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace PowerVending\LaravelApiQueryBuilder\SearchCallbacks;
 
@@ -173,14 +173,16 @@ abstract class AbstractCallback
     protected function containsCallback(Builder $builder, string $column, CategorizedValues $values, string $operator)
     {
         if ($values->andLike) {
-            $builder->where($column, $this->getLikeOperator(), '%' . $values->andLike[0] . '%');
+            $escaped = $this->escapeLikeValue($values->andLike[0]);
+            $builder->where($column, $this->getLikeOperator(), '%' . $escaped . '%');
         }
 
         if ($values->and) {
             $builder->where(function (Builder $q) use ($column, $values) {
                 foreach (array_values($values->and) as $i => $andValue) {
                     $method = $i === 0 ? 'where' : 'orWhere';
-                    $q->{$method}($column, $this->getLikeOperator(), '%' . $andValue . '%');
+                    $escaped = $this->escapeLikeValue($andValue);
+                    $q->{$method}($column, $this->getLikeOperator(), '%' . $escaped . '%');
                 }
             });
         }
@@ -197,14 +199,16 @@ abstract class AbstractCallback
     protected function endsWithCallback(Builder $builder, string $column, CategorizedValues $values, string $operator)
     {
         if ($values->andLike) {
-            $builder->where($column, $this->getLikeOperator(), '%' . $values->andLike[0]);
+            $escaped = $this->escapeLikeValue($values->andLike[0]);
+            $builder->where($column, $this->getLikeOperator(), '%' . $escaped);
         }
 
         if ($values->and) {
             $builder->where(function (Builder $q) use ($column, $values) {
                 foreach (array_values($values->and) as $i => $andValue) {
                     $method = $i === 0 ? 'where' : 'orWhere';
-                    $q->{$method}($column, $this->getLikeOperator(), '%' . $andValue);
+                    $escaped = $this->escapeLikeValue($andValue);
+                    $q->{$method}($column, $this->getLikeOperator(), '%' . $escaped);
                 }
             });
         }
@@ -221,14 +225,16 @@ abstract class AbstractCallback
     protected function startsWithCallback(Builder $builder, string $column, CategorizedValues $values, string $operator)
     {
         if ($values->andLike) {
-            $builder->where($column, $this->getLikeOperator(), $values->andLike[0] . '%');
+            $escaped = $this->escapeLikeValue($values->andLike[0]);
+            $builder->where($column, $this->getLikeOperator(), $escaped . '%');
         }
 
         if ($values->and) {
             $builder->where(function (Builder $q) use ($column, $values) {
                 foreach (array_values($values->and) as $i => $andValue) {
                     $method = $i === 0 ? 'where' : 'orWhere';
-                    $q->{$method}($column, $this->getLikeOperator(), $andValue . '%');
+                    $escaped = $this->escapeLikeValue($andValue);
+                    $q->{$method}($column, $this->getLikeOperator(), $escaped . '%');
                 }
             });
         }
@@ -262,6 +268,15 @@ abstract class AbstractCallback
         }
 
         return 'LIKE';
+    }
+
+    /**
+     * Escapes backslashes in LIKE pattern values so MariaDB/MySQL treat them as literals.
+     * Without this, `\/` in a stored value would not match because `\` is an escape char in LIKE.
+     */
+    protected function escapeLikeValue(string $value): string
+    {
+        return str_replace('\\', '\\\\', $value);
     }
 
     protected function checkExecuteForCustomfieldsParameter($builder)
