@@ -173,16 +173,14 @@ abstract class AbstractCallback
     protected function containsCallback(Builder $builder, string $column, CategorizedValues $values, string $operator)
     {
         if ($values->andLike) {
-            $escaped = $this->escapeLikeValue($values->andLike[0]);
-            $builder->where($column, $this->getLikeOperator(), '%' . $escaped . '%');
+            $builder->where($column, $this->getLikeOperator(), '%' . $values->andLike[0] . '%');
         }
 
         if ($values->and) {
             $builder->where(function (Builder $q) use ($column, $values) {
                 foreach (array_values($values->and) as $i => $andValue) {
                     $method = $i === 0 ? 'where' : 'orWhere';
-                    $escaped = $this->escapeLikeValue($andValue);
-                    $q->{$method}($column, $this->getLikeOperator(), '%' . $escaped . '%');
+                    $q->{$method}($column, $this->getLikeOperator(), '%' . $andValue . '%');
                 }
             });
         }
@@ -199,16 +197,14 @@ abstract class AbstractCallback
     protected function endsWithCallback(Builder $builder, string $column, CategorizedValues $values, string $operator)
     {
         if ($values->andLike) {
-            $escaped = $this->escapeLikeValue($values->andLike[0]);
-            $builder->where($column, $this->getLikeOperator(), '%' . $escaped);
+            $builder->where($column, $this->getLikeOperator(), '%' . $values->andLike[0]);
         }
 
         if ($values->and) {
             $builder->where(function (Builder $q) use ($column, $values) {
                 foreach (array_values($values->and) as $i => $andValue) {
                     $method = $i === 0 ? 'where' : 'orWhere';
-                    $escaped = $this->escapeLikeValue($andValue);
-                    $q->{$method}($column, $this->getLikeOperator(), '%' . $escaped);
+                    $q->{$method}($column, $this->getLikeOperator(), '%' . $andValue);
                 }
             });
         }
@@ -225,16 +221,14 @@ abstract class AbstractCallback
     protected function startsWithCallback(Builder $builder, string $column, CategorizedValues $values, string $operator)
     {
         if ($values->andLike) {
-            $escaped = $this->escapeLikeValue($values->andLike[0]);
-            $builder->where($column, $this->getLikeOperator(), $escaped . '%');
+            $builder->where($column, $this->getLikeOperator(), $values->andLike[0] . '%');
         }
 
         if ($values->and) {
             $builder->where(function (Builder $q) use ($column, $values) {
                 foreach (array_values($values->and) as $i => $andValue) {
                     $method = $i === 0 ? 'where' : 'orWhere';
-                    $escaped = $this->escapeLikeValue($andValue);
-                    $q->{$method}($column, $this->getLikeOperator(), $escaped . '%');
+                    $q->{$method}($column, $this->getLikeOperator(), $andValue . '%');
                 }
             });
         }
@@ -268,15 +262,6 @@ abstract class AbstractCallback
         }
 
         return 'LIKE';
-    }
-
-    /**
-     * Escapes backslashes in LIKE pattern values so MariaDB/MySQL treat them as literals.
-     * Without this, `\/` in a stored value would not match because `\` is an escape char in LIKE.
-     */
-    protected function escapeLikeValue(string $value): string
-    {
-        return str_replace('\\', '\\\\', $value);
     }
 
     protected function checkExecuteForCustomfieldsParameter($builder)
