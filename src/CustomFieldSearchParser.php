@@ -62,6 +62,11 @@ class CustomFieldSearchParser implements SearchParserInterface
         $this->type = $this->getColumnType();
     }
 
+    public function getOperator(): string
+    {
+        return $this->operator;
+    }
+
     /**
      * @param  $operators
      * @param  string  $argument

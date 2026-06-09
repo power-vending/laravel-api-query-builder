@@ -97,10 +97,10 @@ class CategorizedValues
      */
     public function format()
     {
-        $this->and = $this->type->prepare($this->and);
-        $this->andLike = $this->type->prepare($this->andLike);
-        $this->not = $this->type->prepare($this->not);
-        $this->notLike = $this->type->prepare($this->notLike);
+        $this->and = $this->type->prepare($this->and, $this->searchParser);
+        $this->andLike = $this->type->prepare($this->andLike, $this->searchParser);
+        $this->not = $this->type->prepare($this->not, $this->searchParser);
+        $this->notLike = $this->type->prepare($this->notLike, $this->searchParser);
     }
 
     protected function isNegated($splitValue): bool
