@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace PowerVending\LaravelApiQueryBuilder\Types;
 
 use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
+use PowerVending\LaravelApiQueryBuilder\SearchParserInterface;
 
 class BooleanType extends AbstractType
 {
@@ -15,11 +16,12 @@ class BooleanType extends AbstractType
 
     /**
      * @param  array  $values
+     * @param  SearchParserInterface|null  $searchParser
      * @return array
      *
      * @throws ApiQueryBuilderException
      */
-    public function prepare(array $values): array
+    public function prepare(array $values, ?SearchParserInterface $searchParser = null): array
     {
         foreach ($values as &$value) {
             $value = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);

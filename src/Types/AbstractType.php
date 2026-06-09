@@ -4,6 +4,8 @@ declare(strict_types = 1);
 
 namespace PowerVending\LaravelApiQueryBuilder\Types;
 
+use PowerVending\LaravelApiQueryBuilder\SearchParserInterface;
+
 abstract class AbstractType
 {
     /**
@@ -17,9 +19,10 @@ abstract class AbstractType
      * Prepare/transform values for query if needed.
      *
      * @param  array  $values
+     * @param  SearchParserInterface|null  $searchParser
      * @return array
      */
-    public function prepare(array $values): array
+    public function prepare(array $values, ?SearchParserInterface $searchParser = null): array
     {
         return $values;
     }

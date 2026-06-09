@@ -64,6 +64,11 @@ class SearchParser implements SearchParserInterface
      *
      * @throws ApiQueryBuilderException
      */
+    public function getOperator(): string
+    {
+        return $this->operator;
+    }
+
     public function isModelRelation(): bool
     {
 
