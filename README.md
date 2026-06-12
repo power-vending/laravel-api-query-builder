@@ -17,7 +17,9 @@
     - [Guia de decisão: notação com ponto vs. sub-search nested](#guia-de-decisão-notação-com-ponto-vs-sub-search-nested)
 11. [Exemplos práticos completos](#exemplos-práticos-completos)
 12. [Customizações avançadas](#customizações-avançadas)
-    - [Operadores por cast (cast_operators)](#operadores-por-cast-cast_operators)
+    - [Sistema de tipos (`types`)](#sistema-de-tipos-types)
+    - [Operadores por cast (`cast_operators`)](#operadores-por-cast-cast_operators)
+    - [Como `types` e `cast_operators` trabalham juntos](#como-types-e-cast_operators-trabalham-juntos)
 13. [Erros retornados pela API](#erros-retornados-pela-api)
 14. [Solução de problemas](#solução-de-problemas)
 15. [Testes](#testes)
@@ -2543,117 +2545,214 @@ public function index(Request $request)
 }
 ```
 
-### Operadores por cast (`cast_operators`)
+### Sistema de tipos (`types`)
 
-A chave `cast_operators` no arquivo `config/api-query-builder.php` permite restringir quais operadores estão disponíveis para campos cujo tipo é determinado pelo **cast do model**. Isso inclui casts nativos do Laravel e casts personalizados. Se um cast for mapeado aqui, apenas os operadores listados serão aceitos para campos com esse cast — tanto na rota de schema quanto na validação da query.
+O sistema de **types** é o mecanismo responsável por preparar, transformar e validar os valores de busca enviados pelo frontend *antes* que a query SQL seja gerada. Isso garante que os dados cheguem ao banco no formato correto para comparação.
 
-Quando um cast **não** estiver mapeado em `cast_operators`, o fluxo normal de resolução por tipo de coluna é mantido (sem restrição adicional).
+Por exemplo:
+*   **Booleanos:** Transforma `"true"` ou `"1"` em um booleano real (`true`), evitando erros de tipo no banco.
+*   **JSON:** Aplica `json_encode` em objetos/arrays para que a comparação exata no banco de dados seja possível.
 
-#### Configuração
+#### Como o tipo de um campo é descoberto?
+O tipo da coluna é resolvido automaticamente na seguinte ordem de prioridade:
+1.  **Casts do Model:** O pacote verifica a propriedade `$casts` no Model (ex: `'boolean'`, ou um cast customizado como `App\Casts\DynamicConfiguration::class`).
+2.  **Schema do Banco de Dados:** Se não houver cast definido, ele consulta a coluna da tabela (ex: `varchar(191)`, `integer`, `json`).
+3.  **Fallback (`generic`):** Caso não encontre nenhuma informação, assume o tipo genérico `generic`.
 
-Abra `config/api-query-builder.php` e adicione a chave `cast_operators`:
+---
+
+#### Classes de Tipo Disponíveis
+
+Todas as classes de tipo estendem `AbstractType` (caminho: `src/Types/AbstractType.php`) e ficam sob o namespace `PowerVending\LaravelApiQueryBuilder\Types`.
+
+1.  **`AbstractType` (Classe Base Abstrata):**
+    É a classe mãe de todos os tipos. Define os métodos:
+    *   `abstract public static function name(): string`: Retorna o identificador do tipo (deve bater com o cast do Model ou tipo de coluna no banco).
+    *   `public function prepare(array $values, ?SearchParserInterface $searchParser = null): array`: Recebe a lista de valores a serem pesquisados e o parser da busca. Retorna os valores prontos para a query. Por padrão, retorna os valores inalterados.
+
+2.  **`BooleanType` (Validação Booleana):**
+    Identificado pelo nome `'boolean'`. Ele limpa e valida os valores booleano recebidos (como `true`, `false`, `1`, `0`, `yes`, `no`, `on`, `off`) convertendo-os para booleanos reais usando `filter_var()`. Se o valor for inválido, lança uma `ApiQueryBuilderException` com a mensagem `Wrong argument type provided`.
+
+3.  **`GenericType` (Fallback Padrão):**
+    Identificado pelo nome `'generic'`. Ele não altera nem valida os valores (apenas os retorna inalterados). Funciona como o comportamento padrão para qualquer tipo não mapeado explicitamente.
+
+---
+
+#### O Registry de Configuração e o lookup no `TypesConfig`
+
+O registro dos tipos ativos é feito no arquivo `config/api-query-builder.php` através da chave `types`:
 
 ```php
+'types' => [
+    PowerVending\LaravelApiQueryBuilder\Types\GenericType::class,
+    PowerVending\LaravelApiQueryBuilder\Types\BooleanType::class,
+],
+```
+
+A classe `TypesConfig` (`src/Config/TypesConfig.php`) gerencia esse registro e resolve qual classe deve processar o valor através do método `getTypeClassFromTypeName(string $typeName)`.
+
+##### Fluxo de Resolução do Lookup:
+1.  **Verificação Direta:** Ele busca se o tipo resolvido (`$typeName`) está mapeado no registry de `types` (usando o retorno do método `name()`). Se encontrar, retorna a instância do tipo correspondente.
+2.  **Fallback para `generic`:** Se o tipo não estiver mapeado (por exemplo, um campo de texto sem cast registrado), ele verifica se o `GenericType` está registrado no registry. Se sim, retorna a instância do `GenericType`.
+3.  **Exceção:** Caso o tipo não esteja mapeado e o `GenericType` também não esteja registrado no registry, ele lança uma `ApiQueryBuilderException`: `"No valid callback for '$typeName' type."`.
+
+---
+
+#### Integração Interna com `CategorizedValues`
+
+Toda a transformação e distribuição de dados acontece no componente `CategorizedValues` (`src/CategorizedValues.php`).
+
+Quando o pacote processa um filtro, o `CategorizedValues` faz o seguinte:
+1.  **Identifica o Tipo:** No construtor, ele descobre o tipo apropriado usando o `TypesConfig`:
+    ```php
+    $this->type = (new TypesConfig())->getTypeClassFromTypeName($this->searchParser->type);
+    ```
+2.  **Categoriza os Valores:** Separa os valores de filtro em 4 grupos ("buckets") de acordo com os micro-operadores (como `!`, `%`, `null`, `!null`):
+    *   `$and`: Valores com match exato ou parcial positivo.
+    *   `$andLike`: Valores textuais (LIKE) positivos.
+    *   `$not`: Valores com negação.
+    *   `$notLike`: Valores textuais com negação.
+3.  **Aplica a Transformação (`format()`):** Executa o método `prepare()` da classe de tipo em cada um dos buckets para garantir que todos os valores passem pela transformação ou validação devida:
+    ```php
+    $this->and     = $this->type->prepare($this->and, $this->searchParser);
+    $this->andLike = $this->type->prepare($this->andLike, $this->searchParser);
+    $this->not     = $this->type->prepare($this->not, $this->searchParser);
+    $this->notLike = $this->type->prepare($this->notLike, $this->searchParser);
+    ```
+
+---
+
+#### Criando um Tipo Customizado
+
+Para campos complexos ou personalizados, você pode criar o seu próprio tradutor de tipo.
+
+##### Exemplo de Caso de Uso: Campo JSON
+Suponha que você tenha um cast customizado chamado `JsonColumn`. Quando o frontend filtrar por igualdade (`EQ`), você precisa aplicar `json_encode` no valor para buscar corretamente no banco. Porém, se for uma busca textual (`LIKE`), você quer o valor cru.
+
+##### 1. Criar a classe do tipo
+```php
+<?php
+
+namespace App\Types;
+
+use PowerVending\LaravelApiQueryBuilder\Types\AbstractType;
+use PowerVending\LaravelApiQueryBuilder\SearchParserInterface;
+
+class JsonColumnType extends AbstractType
+{
+    public static function name(): string
+    {
+        // Deve ser o FQCN (caminho completo) do seu cast no Model
+        return \App\Casts\JsonColumn::class;
+    }
+
+    public function prepare(array $values, ?SearchParserInterface $searchParser = null): array
+    {
+        $operator = $searchParser?->getOperator();
+
+        // Operadores de texto: mantém o valor cru para buscas parciais
+        if (in_array($operator, ['LIKE:', 'STARTS_WITH:', 'ENDS_WITH:'], true)) {
+            return $values;
+        }
+
+        // Operador de comparação exata (EQ): serializa o valor para JSON
+        return array_map(function ($value) {
+            return json_encode($value, JSON_THROW_ON_ERROR);
+        }, $values);
+    }
+}
+```
+
+##### 2. Registrar no config (`config/api-query-builder.php`)
+```php
+'types' => [
+    \PowerVending\LaravelApiQueryBuilder\Types\GenericType::class,
+    \PowerVending\LaravelApiQueryBuilder\Types\BooleanType::class,
+    \App\Types\JsonColumnType::class, // Registro do seu tipo customizado
+],
+```
+
+---
+
+### Operadores por cast (`cast_operators`)
+
+A chave `cast_operators` no arquivo `config/api-query-builder.php` permite restringir quais operadores de busca estão disponíveis para campos do Model, baseando-se no cast configurado para eles. Isso serve como uma camada extra de validação e segurança.
+
+#### Como funciona a resolução de chaves?
+Quando o pacote valida os operadores de um campo, ele resolve a chave configurada no `cast_operators` da seguinte forma:
+1.  **Busca Exata:** Procura pelo nome exato do tipo ou FQCN do cast (ex: `App\Casts\DynamicConfiguration::class`).
+2.  **Normalização:** Se não encontrar, ele normaliza o tipo para lowercase e remove sufixos de parênteses (ex: `varchar(191)` vira `varchar`).
+3.  **Sem restrição:** Se nenhuma chave corresponder, assume que o campo não possui restrição de operadores.
+
+#### Exemplo de Configuração Real (Projeto Engineering)
+No projeto **Engineering**, os campos com casts customizados `DynamicConfiguration` e `DynamicProperty` restringem os operadores permitidos no arquivo de configuração `config/api-query-builder.php`:
+
+```php
+use App\Casts\DynamicConfiguration;
+use App\Casts\DynamicProperty;
 use PowerVending\LaravelApiQueryBuilder\SearchCallbacks\{
-    Between,
-    Equals,
-    GreaterThan,
-    GreaterThanOrEqual,
-    LessThan,
-    LessThanOrEqual,
-    NotBetween,
-    NotEquals,
+    Equals, Like, Between, LessThan, GreaterThan, StartsWith, EndsWith, NotEquals, NotBetween, LessThanOrEqual, GreaterThanOrEqual
 };
 
 return [
     // ...
-
     'cast_operators' => [
-        'integer' => [
+        // Restrição para o cast de configurações dinâmicas
+        DynamicConfiguration::class => [
             Equals::class,
-            NotEquals::class,
-            LessThan::class,
-            LessThanOrEqual::class,
-            GreaterThan::class,
-            GreaterThanOrEqual::class,
+            Like::class,
             Between::class,
+            LessThan::class,
+            GreaterThan::class,
+            StartsWith::class,
+            EndsWith::class,
+            NotEquals::class,
             NotBetween::class,
+            LessThanOrEqual::class,
+            GreaterThanOrEqual::class,
         ],
-        'boolean' => [
+        // Restrição para o cast de propriedades dinâmicas
+        DynamicProperty::class => [
             Equals::class,
+            Like::class,
+            Between::class,
+            LessThan::class,
+            GreaterThan::class,
+            StartsWith::class,
+            EndsWith::class,
+            NotEquals::class,
+            NotBetween::class,
+            LessThanOrEqual::class,
+            GreaterThanOrEqual::class,
         ],
     ],
 ];
 ```
 
-Os nomes das chaves devem corresponder aos tipos de cast do Laravel e também aos casts personalizados definidos no model (ex.: `'integer'`, `'boolean'`, `'string'`, `'float'`, `'date'`).
+#### Efeito no Schema e na Validação
+1.  **Schema da API:** A rota `/schema` do recurso só listará os operadores configurados para estes campos.
+2.  **Validação:** Se o frontend tentar rodar uma query não permitida (ex: `{"configuration": "JSON_SEARCH:$.key"}`), a API rejeitará e retornará a exceção `ApiQueryBuilderException` com a mensagem:
+    > `Operator 'JSON_SEARCH:' is not allowed for cast type 'App\Casts\DynamicConfiguration' on column 'configuration'.`
 
-#### Efeito no schema
+---
 
-A rota de schema retornará apenas os operadores configurados para o cast correspondente, em vez da lista padrão baseada no tipo da coluna:
+### Como `types` e `cast_operators` trabalham juntos
 
-```json
-{
-    "searchable_columns": {
-        "is_active": {
-            "type": "boolean",
-            "operators": ["EQ"],
-            "nullable": false
-        },
-        "price": {
-            "type": "integer",
-            "operators": ["BT", "EQ", "GE", "GT", "LE", "LT", "NB", "NE"],
-            "nullable": false
-        }
-    }
-}
-```
+Eles atuam em conjunto sobre o **mesmo tipo resolvido** do campo, mas em momentos e com responsabilidades bem definidas:
 
-#### Efeito na validação de queries
+1.  **Validação de Operador (`cast_operators`):**
+    O pacote intercepta a requisição e verifica se o operador enviado pelo frontend é aceito pelo cast do campo (ex: *"O operador `LIKE:` é permitido para o cast `DynamicConfiguration`?"*). Se sim, a requisição continua.
+2.  **Preparação e Formatação de Dados (`types`):**
+    O valor do filtro é enviado para a classe de tipo associada (ex: `DynamicConfigurationType`), que prepara a formatação do valor (ex: faz um `json_encode` para busca `EQ` ou mantém o valor cru para busca `LIKE`).
+3.  **Montagem da Query:**
+    Com o operador validado e os valores devidamente convertidos para o formato que o banco de dados espera, o pacote monta a query SQL.
 
-Se o frontend tentar usar um operador que não está na lista permitida para o cast do campo, a API retornará um erro:
-
-```json
-{"is_active": "GT:1"}
-```
-
-→ Lança `ApiQueryBuilderException`: `Operator 'GT:' is not allowed for cast type 'boolean' on column 'is_active'.`
-
-Apenas `EQ:` seria aceito para esse campo nesse exemplo.
-
-#### Exemplo completo com model
-
-**Model:**
-
-```php
-class Product extends Model
-{
-    use ApiQueryBuilder;
-
-    protected $casts = [
-        'price'     => 'integer',
-        'is_active' => 'boolean',
-        'name'      => 'string',
-        'expires_at' => \App\Casts\Iso8601DateTimeString::class,
-    ];
-}
-```
-
-**Config:**
-
-```php
-'cast_operators' => [
-    'integer' => [Equals::class, LessThan::class, GreaterThan::class, Between::class],
-    'boolean' => [Equals::class],
-    \App\Casts\Iso8601DateTimeString::class => [Equals::class, LessThan::class, GreaterThan::class, Between::class],
-],
-```
-
-**Resultado:**
-- `price` (cast `integer`): aceita `EQ:`, `LT:`, `GT:`, `BT:` — outros operadores retornam erro
-- `is_active` (cast `boolean`): aceita apenas `EQ:`
-- `name` (cast `string`): não está mapeado em `cast_operators` — usa o fluxo normal de texto (`LIKE:`, `STARTS_WITH:`, `EQ:`, `NE:`, etc.)
-- `expires_at` (cast personalizado `Iso8601DateTimeString`): aceita os operadores configurados para esse cast em `cast_operators`
+| Aspecto | `cast_operators` | `types` |
+| :--- | :--- | :--- |
+| **Responsabilidade** | Restringir quais operadores são permitidos | Transformar/validar o valor do filtro (`prepare()`) |
+| **Momento de Execução** | Na construção do parser da query e na rota `/schema` | Durante o mapeamento dos filtros em `CategorizedValues::format()` |
+| **Lookup de Classe** | Mapeamento no `cast_operators` do config | Mapeamento de `name()` no registry de `types` do config |
+| **Fallback** | Fluxo normal do tipo da coluna no banco (sem restrições) | Tipo fallback `GenericType` (sem transformações) |
 
 ---
 
@@ -2842,6 +2941,31 @@ Requisição inválida:
 1. Use um dos operadores permitidos para o cast do campo (consulte a rota de schema para ver quais estão disponíveis).
 2. Se o operador for necessário, adicione-o à lista de `cast_operators` para o cast correspondente no arquivo de configuração.
 3. Se não quiser restrição para esse cast, remova a entrada de `cast_operators`.
+
+### `Wrong argument type provided`
+
+**Exceção:** `ApiQueryBuilderException`
+
+**Causa:** Um filtro foi aplicado em uma coluna com cast `boolean` (booleano), mas o valor enviado não pôde ser convertido para booleano.
+
+**Exemplo que causa o erro:**
+```json
+{"is_active": "EQ:talvez"}
+```
+
+**Solução:** Envie apenas valores booleanos aceitos (`true`, `false`, `1`, `0`, `yes`, `no`, `on`, `off`).
+
+---
+
+### `No valid callback for '<TYPE>' type.`
+
+**Exceção:** `ApiQueryBuilderException`
+
+**Causa:** O tipo identificado para a coluna no banco de dados ou no Model não possui uma classe de tratamento correspondente registrada em `types` (e o fallback geral `GenericType` não está configurado).
+
+**Solução:**
+1. Verifique se `GenericType::class` está registrado na chave `types` do arquivo de configuração `config/api-query-builder.php`. Ele funciona como o fallback padrão.
+2. Se o campo exige uma conversão customizada, crie e registre seu tipo customizado na configuração (veja [Criando e Registrando um Tipo Customizado](#criando-e-registrando-um-tipo-customizado)).
 
 ---
 
