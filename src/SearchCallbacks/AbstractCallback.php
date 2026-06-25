@@ -113,28 +113,28 @@ abstract class AbstractCallback
                 return;
             }
 
-            $column = $this->qualifyColumnName($relatedColumns);
-            $this->execute($builder, $column, $values);
+            $this->execute($builder, $relatedColumns, $values);
             $this->checkExecuteForCustomfieldsParameter($builder);
         });
     }
 
     /**
-     * Qualify column names with the current query model table to avoid ambiguity when joins are present.
+     * Qualify column names with the query model table to avoid ambiguity when joins are present.
      */
-    protected function qualifyColumnName(string $column): string
+    protected function qualifyColumnName(string $column, ?Builder $builder = null): string
     {
         if (str_contains($column, '.')) {
             return $column;
         }
 
-        $model = $this->builder->getModel();
+        $builder ??= $this->builder;
+        $model = $builder->getModel();
 
         if ($model === null) {
             return $column;
         }
 
-        return $this->builder->qualifyColumn($column);
+        return $builder->qualifyColumn($column);
     }
 
     /**

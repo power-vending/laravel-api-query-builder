@@ -415,6 +415,26 @@ class ApiQueryTest extends TestCase
 
         $this->assertStringContainsString('exists (select * from "related"', $sql);
         $this->assertStringContainsString('"description" in (?)', $sql);
+        $this->assertStringNotContainsString('"test"."description"', $sql);
+    }
+
+    /** @test */
+    public function search_by_belongs_to_relation_column_uses_related_table_not_parent()
+    {
+        $input = [
+            'search' => [
+                'company.id' => 'EQ:1',
+            ],
+        ];
+
+        $jsonQuery = new ApiQuery($this->builder, $input);
+        $jsonQuery->search();
+
+        $sql = $this->builder->toSql();
+
+        $this->assertStringContainsString('exists (select * from "companies"', $sql);
+        $this->assertStringContainsString('"id" in (?)', $sql);
+        $this->assertStringNotContainsString('"test"."id" in (?)', $sql);
     }
 
     /** @test */
