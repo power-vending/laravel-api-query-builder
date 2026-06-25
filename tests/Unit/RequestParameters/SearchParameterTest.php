@@ -91,7 +91,7 @@ class SearchParameterTest extends TestCase
         $searchParameter = $this->createSearchParameter($arguments);
         $searchParameter->run();
 
-        $query = 'select * from "test" where ((("attribute1" in (?))) and (("attribute2" in (?))))';
+        $query = 'select * from "test" where ((("test"."attribute1" in (?))) and (("test"."attribute2" in (?))))';
 
         $this->assertEquals($query, $this->builder->toSql());
     }
@@ -106,7 +106,7 @@ class SearchParameterTest extends TestCase
         $searchParameter = $this->createSearchParameter($arguments);
         $searchParameter->run();
 
-        $query = 'select * from "test" where ((("attribute1" in (?, ?))))';
+        $query = 'select * from "test" where ((("test"."attribute1" in (?, ?))))';
 
         $this->assertEquals($query, $this->builder->toSql());
     }
@@ -121,7 +121,7 @@ class SearchParameterTest extends TestCase
         $searchParameter = $this->createSearchParameter($arguments);
         $searchParameter->run();
 
-        $query = 'select * from "test" where ((("attribute1" not in (?))))';
+        $query = 'select * from "test" where ((("test"."attribute1" not in (?))))';
 
         $this->assertEquals($query, $this->builder->toSql());
     }
@@ -136,7 +136,7 @@ class SearchParameterTest extends TestCase
         $searchParameter = $this->createSearchParameter($arguments);
         $searchParameter->run();
 
-        $query = 'select * from "test" where ((("attribute1" not in (?, ?))))';
+        $query = 'select * from "test" where ((("test"."attribute1" not in (?, ?))))';
 
         $this->assertEquals($query, $this->builder->toSql());
     }
@@ -151,7 +151,7 @@ class SearchParameterTest extends TestCase
         $searchParameter = $this->createSearchParameter($arguments);
         $searchParameter->run();
 
-        $query = 'select * from "test" where ((("attribute1" < ?)))';
+        $query = 'select * from "test" where ((("test"."attribute1" < ?)))';
 
         $this->assertEquals($query, $this->builder->toSql());
     }
@@ -166,7 +166,7 @@ class SearchParameterTest extends TestCase
         $searchParameter = $this->createSearchParameter($arguments);
         $searchParameter->run();
 
-        $query = 'select * from "test" where ((("attribute1" <= ?)))';
+        $query = 'select * from "test" where ((("test"."attribute1" <= ?)))';
 
         $this->assertEquals($query, $this->builder->toSql());
     }
@@ -181,7 +181,7 @@ class SearchParameterTest extends TestCase
         $searchParameter = $this->createSearchParameter($arguments);
         $searchParameter->run();
 
-        $query = 'select * from "test" where ((("attribute1" > ?)))';
+        $query = 'select * from "test" where ((("test"."attribute1" > ?)))';
 
         $this->assertEquals($query, $this->builder->toSql());
     }
@@ -196,7 +196,7 @@ class SearchParameterTest extends TestCase
         $searchParameter = $this->createSearchParameter($arguments);
         $searchParameter->run();
 
-        $query = 'select * from "test" where ((("attribute1" >= ?)))';
+        $query = 'select * from "test" where ((("test"."attribute1" >= ?)))';
 
         $this->assertEquals($query, $this->builder->toSql());
     }
@@ -211,7 +211,7 @@ class SearchParameterTest extends TestCase
         $searchParameter = $this->createSearchParameter($arguments);
         $searchParameter->run();
 
-        $query = 'select * from "test" where ((("attribute1" between ? and ?)))';
+        $query = 'select * from "test" where ((("test"."attribute1" between ? and ?)))';
 
         $this->assertEquals($query, $this->builder->toSql());
     }
@@ -226,7 +226,7 @@ class SearchParameterTest extends TestCase
         $searchParameter = $this->createSearchParameter($arguments);
         $searchParameter->run();
 
-        $query = 'select * from "test" where ((("attribute1" not between ? and ?)))';
+        $query = 'select * from "test" where ((("test"."attribute1" not between ? and ?)))';
 
         $this->assertEquals($query, $this->builder->toSql());
     }
@@ -241,7 +241,7 @@ class SearchParameterTest extends TestCase
         $searchParameter = $this->createStringTypeSearchParameter($arguments);
         $searchParameter->run();
 
-        $query = 'select * from "test" where ((("attribute1" LIKE ?)))';
+        $query = 'select * from "test" where ((("test"."attribute1" LIKE ?)))';
 
         $this->assertEquals($query, $this->builder->toSql());
     }
@@ -256,7 +256,7 @@ class SearchParameterTest extends TestCase
         $searchParameter = $this->createStringTypeSearchParameter($arguments);
         $searchParameter->run();
 
-        $query = 'select * from "test" where ((("attribute1" in (?, ?))))';
+        $query = 'select * from "test" where ((("test"."attribute1" in (?, ?))))';
 
         $this->assertEquals($query, $this->builder->toSql());
     }
@@ -271,7 +271,7 @@ class SearchParameterTest extends TestCase
         $searchParameter = $this->createStringTypeSearchParameter($arguments);
         $searchParameter->run();
 
-        $query = 'select * from "test" where ((("attribute1" NOT LIKE ?)))';
+        $query = 'select * from "test" where ((("test"."attribute1" NOT LIKE ?)))';
 
         $this->assertEquals($query, $this->builder->toSql());
     }
@@ -286,7 +286,7 @@ class SearchParameterTest extends TestCase
         $searchParameter = $this->createStringTypeSearchParameter($arguments);
         $searchParameter->run();
 
-        $query = 'select * from "test" where ((("attribute1" NOT LIKE ?)))';
+        $query = 'select * from "test" where ((("test"."attribute1" NOT LIKE ?)))';
 
         $this->assertEquals($query, $this->builder->toSql());
     }
@@ -301,7 +301,7 @@ class SearchParameterTest extends TestCase
         $searchParameter = $this->createStringTypeSearchParameter($arguments);
         $searchParameter->run();
 
-        $query = 'select * from "test" where ((("attribute1" not in (?, ?))))';
+        $query = 'select * from "test" where ((("test"."attribute1" not in (?, ?))))';
 
         $this->assertEquals($query, $this->builder->toSql());
     }
@@ -316,7 +316,7 @@ class SearchParameterTest extends TestCase
         $searchParameter = $this->createSearchParameter($arguments);
         $searchParameter->run();
 
-        $query = 'select * from "test" where ((("attribute1" LIKE ?)))';
+        $query = 'select * from "test" where ((("test"."attribute1" LIKE ?)))';
 
         $this->assertEquals($query, $this->builder->toSql());
     }
@@ -331,7 +331,7 @@ class SearchParameterTest extends TestCase
         $searchParameter = $this->createSearchParameter($arguments);
         $searchParameter->run();
 
-        $query = 'select * from "test" where ((("attribute1" LIKE ?)))';
+        $query = 'select * from "test" where ((("test"."attribute1" LIKE ?)))';
 
         $this->assertEquals($query, $this->builder->toSql());
     }
@@ -346,7 +346,7 @@ class SearchParameterTest extends TestCase
         $searchParameter = $this->createSearchParameter($arguments);
         $searchParameter->run();
 
-        $query = 'select * from "test" where ((("attribute1" LIKE ?)))';
+        $query = 'select * from "test" where ((("test"."attribute1" LIKE ?)))';
 
         $this->assertEquals($query, $this->builder->toSql());
     }
@@ -364,7 +364,7 @@ class SearchParameterTest extends TestCase
         $searchParameter = new SearchParameter($arguments, $this->builder, $modelConfig);
         $searchParameter->run();
 
-        $query = 'select * from "test" where ((("description" LIKE ?)))';
+        $query = 'select * from "test" where ((("test"."description" LIKE ?)))';
 
         $this->assertEquals($query, $this->builder->toSql());
     }
@@ -382,7 +382,7 @@ class SearchParameterTest extends TestCase
         $searchParameter = new SearchParameter($arguments, $this->builder, $modelConfig);
         $searchParameter->run();
 
-        $query = 'select * from "test" where ((("content" LIKE ?)))';
+        $query = 'select * from "test" where ((("test"."content" LIKE ?)))';
 
         $this->assertEquals($query, $this->builder->toSql());
     }
@@ -400,7 +400,7 @@ class SearchParameterTest extends TestCase
         $searchParameter = new SearchParameter($arguments, $this->builder, $modelConfig);
         $searchParameter->run();
 
-        $query = 'select * from "test" where ((("code" LIKE ?)))';
+        $query = 'select * from "test" where ((("test"."code" LIKE ?)))';
 
         $this->assertEquals($query, $this->builder->toSql());
     }
@@ -418,7 +418,7 @@ class SearchParameterTest extends TestCase
         $searchParameter = new SearchParameter($arguments, $this->builder, $modelConfig);
         $searchParameter->run();
 
-        $query = 'select * from "test" where ((("description" in (?, ?))))';
+        $query = 'select * from "test" where ((("test"."description" in (?, ?))))';
 
         $this->assertEquals($query, $this->builder->toSql());
     }

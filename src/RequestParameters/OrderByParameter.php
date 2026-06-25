@@ -57,7 +57,13 @@ class OrderByParameter extends AbstractParameter
             return;
         }
 
-        $this->builder->orderBy($column, $direction);
+        $model = $this->builder->getModel();
+
+        $orderColumn = $model === null
+            ? $column
+            : $this->builder->qualifyColumn($column);
+
+        $this->builder->orderBy($orderColumn, $direction);
     }
 
     /**

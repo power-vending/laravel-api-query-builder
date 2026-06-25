@@ -50,7 +50,8 @@ abstract class AbstractCallback
                 $this->appendRelations($builder, $this->searchParser->column, $this->categorizedValues);
             },
             function (Builder $builder) {
-                $this->execute($builder, $this->searchParser->column, $this->categorizedValues);
+                $column = $this->qualifyColumnName($this->searchParser->column);
+                $this->execute($builder, $column, $this->categorizedValues);
                 $this->checkExecuteForCustomfieldsParameter($builder);
             }
         );
@@ -112,9 +113,28 @@ abstract class AbstractCallback
                 return;
             }
 
-            $this->execute($builder, $relatedColumns, $values);
+            $column = $this->qualifyColumnName($relatedColumns);
+            $this->execute($builder, $column, $values);
             $this->checkExecuteForCustomfieldsParameter($builder);
         });
+    }
+
+    /**
+     * Qualify column names with the current query model table to avoid ambiguity when joins are present.
+     */
+    protected function qualifyColumnName(string $column): string
+    {
+        if (str_contains($column, '.')) {
+            return $column;
+        }
+
+        $model = $this->builder->getModel();
+
+        if ($model === null) {
+            return $column;
+        }
+
+        return $this->builder->qualifyColumn($column);
     }
 
     /**
