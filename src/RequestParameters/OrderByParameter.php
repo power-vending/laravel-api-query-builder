@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\{BelongsTo, BelongsToMany, HasMany, HasOne, Relation};
 use Illuminate\Support\Str;
 use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
+use PowerVending\LaravelApiQueryBuilder\Support\ColumnQualifier;
 
 class OrderByParameter extends AbstractParameter
 {
@@ -57,13 +58,7 @@ class OrderByParameter extends AbstractParameter
             return;
         }
 
-        $model = $this->builder->getModel();
-
-        $orderColumn = $model === null
-            ? $column
-            : $this->builder->qualifyColumn($column);
-
-        $this->builder->orderBy($orderColumn, $direction);
+        $this->builder->orderBy(ColumnQualifier::qualify($this->builder, $column), $direction);
     }
 
     /**
@@ -270,13 +265,7 @@ class OrderByParameter extends AbstractParameter
         $qualifiedColumns = [];
 
         foreach ($query->columns as $column) {
-            // Skip if already qualified (contains a dot) or is a raw expression
-            if (str_contains($column, '.') || str_contains($column, '*')) {
-                $qualifiedColumns[] = $column;
-            } else {
-                // Qualify with parent table name
-                $qualifiedColumns[] = "$parentTable.$column";
-            }
+            $qualifiedColumns[] = ColumnQualifier::qualifyForSelect($column, $parentTable);
         }
 
         // Replace the columns with qualified versions

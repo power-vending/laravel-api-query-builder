@@ -227,9 +227,72 @@ class ApiQueryTest extends TestCase
         $jsonQuery = new ApiQuery($this->builder, $input);
         $jsonQuery->search();
 
-        $sql = 'select * from "test" group by "att1", "att2"';
+        $sql = 'select * from "test" group by "test"."att1", "test"."att2"';
 
         $this->assertEquals($sql, $this->builder->toSql());
+    }
+
+    /** @test */
+    public function qualifies_group_by_columns_when_ordering_by_relation()
+    {
+        $input = [
+            'group_by' => ['created_at'],
+            'order_by' => [
+                'company.id' => 'asc',
+            ],
+        ];
+
+        $jsonQuery = new ApiQuery($this->builder, $input);
+        $jsonQuery->search();
+
+        $sql = $this->builder->toSql();
+
+        $this->assertStringContainsString('left join "companies"', strtolower($sql));
+        $this->assertStringContainsString('group by "test"."created_at"', $sql);
+    }
+
+    /** @test */
+    public function qualifies_simple_returns_columns_but_not_raw_expressions_when_ordering_by_relation()
+    {
+        $input = [
+            'returns' => ['id', 'count:status'],
+            'order_by' => [
+                'company.id' => 'asc',
+            ],
+        ];
+
+        $jsonQuery = new ApiQuery($this->builder, $input);
+        $jsonQuery->search();
+
+        $sql = $this->builder->toSql();
+
+        $this->assertStringContainsString('"test"."id"', $sql);
+        $this->assertStringContainsString('count("status") as count_status', $sql);
+        $this->assertStringNotContainsString('"test".count("status")', $sql);
+    }
+
+    /** @test */
+    public function qualifies_custom_field_identificator_when_ordering_by_relation()
+    {
+        $input = [
+            'search' => [
+                '&&_INC_CF' => [
+                    'custom_field_id' => '5',
+                    'value' => 'EQ:test',
+                ],
+            ],
+            'order_by' => [
+                'company.id' => 'asc',
+            ],
+        ];
+
+        $jsonQuery = new ApiQuery($this->builder, $input);
+        $jsonQuery->search();
+
+        $sql = $this->builder->toSql();
+
+        $this->assertStringContainsString('"test"."custom_field_id" = ?', $sql);
+        $this->assertStringContainsString('"test"."value" in (?)', $sql);
     }
 
     /** @test */
