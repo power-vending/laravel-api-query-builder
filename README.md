@@ -12,6 +12,9 @@
 8. [Uso básico](#uso-básico)
 9. [Parâmetros disponíveis](#parâmetros-disponíveis)
 10. [Trabalhando com relacionamentos](#trabalhando-com-relacionamentos)
+    - [Sub-search nested (busca aninhada)](#sub-search-nested-busca-aninhada)
+    - [Falsos positivos na notação com ponto](#falsos-positivos-na-notação-com-ponto)
+    - [Guia de decisão: notação com ponto vs. sub-search nested](#guia-de-decisão-notação-com-ponto-vs-sub-search-nested)
 11. [Exemplos práticos completos](#exemplos-práticos-completos)
 12. [Customizações avançadas](#customizações-avançadas)
     - [Operadores por cast (cast_operators)](#operadores-por-cast-cast_operators)
@@ -1438,6 +1441,7 @@ O pacote suporta **busca**, **ordenação** e **carregamento** através de relac
 - `BelongsTo` (Pertence a)
 - `HasOne` (Tem um)
 - `HasMany` (Tem muitos)
+- `BelongsToMany` (Muitos para muitos)
 
 ### Busca em campos de relacionamentos
 
@@ -1471,15 +1475,20 @@ class Product extends Model
 }
 ```
 
-**SQL gerado:**
+**SQL gerado (via subconsulta `EXISTS` / `whereHas`):**
 
 ```sql
 SELECT products.*
 FROM products
-LEFT JOIN categories ON products.category_id = categories.id
-WHERE categories.name LIKE '%Electronics%'
-  AND products.price > 100
+WHERE products.price > 100
+  AND EXISTS (
+    SELECT * FROM categories
+    WHERE products.category_id = categories.id
+      AND categories.name LIKE '%Electronics%'
+  )
 ```
+
+> **Nota:** A busca com notação de ponto no parâmetro `search` usa `whereHas`/`EXISTS`, não `LEFT JOIN`. O `LEFT JOIN` é usado pelo parâmetro `order_by` quando há notação de ponto. Veja [Falsos positivos na notação com ponto](#falsos-positivos-na-notação-com-ponto) para entender quando essa diferença importa.
 
 #### Busca em múltiplos níveis de relacionamento
 
@@ -1494,6 +1503,174 @@ Você pode buscar em relacionamentos aninhados:
     "relations": ["category.parent", "store.city"]
 }
 ```
+
+### Sub-search nested (busca aninhada)
+
+Além da notação com ponto (`relation.column`), o pacote suporta **sub-search nested**: filtros aninhados em que a chave do `search` é o nome de um relacionamento e o valor é um objeto com os parâmetros da query a aplicar **dentro** desse relacionamento.
+
+Internamente, isso gera `whereHas` (subconsulta `EXISTS`) no Eloquent — o mesmo mecanismo usado pela notação com ponto, mas com todas as condições agrupadas em um único subquery sobre o relacionamento.
+
+#### Sintaxe
+
+```json
+{
+    "search": {
+        "relationName": {
+            "search": {
+                "column": "OPERADOR:valor"
+            }
+        }
+    }
+}
+```
+
+O objeto aninhado aceita os mesmos parâmetros de uma query normal (`search`, `order_by`, operadores lógicos `&&`/`||`, etc.), aplicados ao model do relacionamento.
+
+> **Obrigatório:** As condições de filtro devem ficar dentro da chave `search`. Se você passar colunas diretamente no objeto do relacionamento (sem `search`), o pacote ainda executa o `whereHas`, mas **não aplica nenhum filtro** dentro dele — o que equivale a “tem pelo menos um registro relacionado”.
+
+#### Exemplo: filtrar registros principais por um relacionamento
+
+**Models (exemplo genérico):**
+
+```php
+class Record extends Model
+{
+    use ApiQueryBuilder;
+
+    public function entries()
+    {
+        return $this->hasMany(Entry::class);
+    }
+}
+```
+
+**JSON — sub-search nested:**
+
+```json
+{
+    "search": {
+        "entries": {
+            "search": {
+                "status": "EQ:active",
+                "score": "GE:80"
+            }
+        }
+    }
+}
+```
+
+**SQL gerado (simplificado):**
+
+```sql
+SELECT records.*
+FROM records
+WHERE EXISTS (
+    SELECT * FROM entries
+    WHERE entries.record_id = records.id
+      AND entries.status IN ('active')
+      AND entries.score >= 80
+)
+```
+
+Todas as condições dentro de `entries.search` precisam ser satisfeitas pelo **mesmo** registro em `entries`.
+
+#### Exemplo: relacionamento aninhado em múltiplos níveis
+
+```json
+{
+    "search": {
+        "container": {
+            "search": {
+                "owner.name": "LIKE:Smith"
+            }
+        }
+    }
+}
+```
+
+#### Exemplo: relacionamento many-to-many
+
+```json
+{
+    "search": {
+        "tags": {
+            "search": {
+                "slug": "EQ:featured"
+            }
+        }
+    }
+}
+```
+
+### Falsos positivos na notação com ponto
+
+Ao aplicar **múltiplas condições sobre o mesmo relacionamento** usando notação com ponto — ou seja, várias chaves `relation.column` distintas no mesmo `search` —, cada chave gera uma subconsulta `EXISTS` (`whereHas`) **independente**.
+
+Em relacionamentos com **mais de um registro relacionado** (`HasMany`, `BelongsToMany`), condições distintas podem ser satisfeitas por **registros diferentes** do relacionamento. O registro principal aparece nos resultados mesmo que **nenhum** registro relacionado individual satisfaça todas as condições ao mesmo tempo.
+
+#### Exemplo do problema
+
+Considere um `Record` com duas `entries`:
+
+| entry | status | score |
+|-------|--------|-------|
+| A     | active | 50    |
+| B     | draft  | 90    |
+
+**Busca com notação com ponto (incorreta para este caso):**
+
+```json
+{
+    "search": {
+        "entries.status": "EQ:active",
+        "entries.score": "GE:80"
+    }
+}
+```
+
+**Por que retorna o registro (falso positivo):**
+
+- `entries.status = active` → satisfeito pela entry A
+- `entries.score >= 80` → satisfeito pela entry B
+- Nenhuma entry satisfaz **ambas** as condições, mas o `Record` é retornado
+
+**Busca correta com sub-search nested:**
+
+```json
+{
+    "search": {
+        "entries": {
+            "search": {
+                "status": "EQ:active",
+                "score": "GE:80"
+            }
+        }
+    }
+}
+```
+
+Aqui as condições são avaliadas dentro de um único `whereHas` — apenas registros com pelo menos uma entry que satisfaça **todas** as condições são retornados.
+
+#### Campos do model principal
+
+Este problema **não se aplica** a múltiplas condições em colunas do model principal (sem notação de ponto). Condições como `"status": "EQ:active"` e `"score": "GE:80"` no mesmo `search` são aplicadas diretamente na mesma linha da tabela principal via `WHERE` — não há risco de falsos positivos por registros distintos.
+
+Da mesma forma, combinar operadores na **mesma coluna** (ex.: `"name": "EQ:foo%&&EQ:%bar"`) também avalia todas as condições sobre o mesmo valor/campo.
+
+> **Nota sobre `order_by`:** A ordenação por relacionamento com notação de ponto usa `LEFT JOIN` e pode causar duplicação de linhas em `HasMany`/`BelongsToMany` (veja [Limitações e boas práticas](#limitações-e-boas-práticas)). Esse é um problema distinto, relacionado à listagem/ordenação, não à semântica de filtro descrita acima.
+
+### Guia de decisão: notação com ponto vs. sub-search nested
+
+| Cenário | Abordagem recomendada |
+|---------|----------------------|
+| Uma única condição em um relacionamento (`relation.column`) | Notação com ponto |
+| Relacionamento `BelongsTo` / `HasOne` com múltiplas condições no mesmo relacionamento | Notação com ponto (há no máximo um registro relacionado) |
+| Relacionamento `HasMany` / `BelongsToMany` com **múltiplas condições** que devem valer para o **mesmo** registro relacionado | **Sub-search nested** (obrigatório) |
+| Filtros complexos dentro do relacionamento (agrupamentos `&&`/`||`, ordenação, etc.) | **Sub-search nested** |
+| Relacionamentos aninhados em vários níveis com várias condições no mesmo ramo | **Sub-search nested** (mais legível e semanticamente correto) |
+| Apenas carregar/filtrar dados do relacionamento no eager loading, sem afetar quais registros principais retornam | Objeto em `relations` (veja [Configurações avançadas de relacionamentos](#configurações-avançadas-de-relacionamentos)) |
+
+**Regra prática:** Se você precisa que duas ou mais condições sobre o **mesmo** relacionamento `HasMany`/`BelongsToMany` sejam verdadeiras para o **mesmo** registro filho, use sub-search nested. Use notação com ponto quando cada condição pode ser satisfeita independentemente ou quando há apenas um registro relacionado.
 
 ### Ordenação por relacionamento
 
@@ -1936,13 +2113,15 @@ class Product extends Model
 #### Limitações e boas práticas
 
 **✅ Suportado:**
-- Busca em campos de relacionamentos `BelongsTo`, `HasOne`
+- Busca em campos de relacionamentos `BelongsTo`, `HasOne`, `HasMany`, `BelongsToMany` (via notação com ponto ou sub-search nested)
 - Ordenação em campos de relacionamentos `BelongsTo`, `HasOne`
 - Múltiplos relacionamentos na mesma query
 - Relacionamentos aninhados (ex: `category.parent.name`)
+- Sub-search nested com `whereHas`/`EXISTS` para filtros semanticamente corretos em cardinalidade muitos
 
 **⚠️ Atenção:**
-- Relacionamentos `HasMany` podem gerar resultados duplicados
+- Múltiplas chaves `relation.column` no mesmo relacionamento `HasMany`/`BelongsToMany` podem gerar [falsos positivos](#falsos-positivos-na-notação-com-ponto) — prefira [sub-search nested](#sub-search-nested-busca-aninhada)
+- Relacionamentos `HasMany` em `order_by` podem gerar resultados duplicados (devido ao `LEFT JOIN`)
 - Use `returns` para evitar conflitos de coluna com mesmo nome
 - Sempre inclua o relacionamento no `relations` quando buscar/ordenar por ele
 
