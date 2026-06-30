@@ -67,6 +67,11 @@ class CustomFieldSearchParser implements SearchParserInterface
         return $this->operator;
     }
 
+    public function isModelRelation(): bool
+    {
+        return false;
+    }
+
     /**
      * @param  $operators
      * @param  string  $argument

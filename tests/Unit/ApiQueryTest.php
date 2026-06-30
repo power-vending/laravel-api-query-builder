@@ -47,7 +47,7 @@ class ApiQueryTest extends TestCase
         $jsonQuery = new ApiQuery($this->builder, $input);
         $jsonQuery->search();
 
-        $sql = 'select * from "test" where ((("att1" in (?))))';
+        $sql = 'select * from "test" where ((("test"."att1" in (?))))';
 
         $this->assertEquals($sql, $this->builder->toSql());
     }
@@ -65,7 +65,7 @@ class ApiQueryTest extends TestCase
         $jsonQuery = new ApiQuery($this->builder, $input);
         $jsonQuery->search();
 
-        $sql = 'select * from "test" where ((("att1" in (?, ?, ?))) and (("att2" in (?, ?, ?))))';
+        $sql = 'select * from "test" where ((("test"."att1" in (?, ?, ?))) and (("test"."att2" in (?, ?, ?))))';
 
         $this->assertEquals($sql, $this->builder->toSql());
     }
@@ -82,7 +82,7 @@ class ApiQueryTest extends TestCase
         $jsonQuery = new ApiQuery($this->builder, $input);
         $jsonQuery->search();
 
-        $sql = 'select * from "test" where ((("att1" in (?) and "att1" not in (?, ?))))';
+        $sql = 'select * from "test" where ((("test"."att1" in (?) and "test"."att1" not in (?, ?))))';
 
         $this->assertEquals($sql, $this->builder->toSql());
     }
@@ -99,7 +99,7 @@ class ApiQueryTest extends TestCase
         $jsonQuery = new ApiQuery($this->builder, $input);
         $jsonQuery->search();
 
-        $sql = 'select * from "test" where ((("att1" LIKE ? and "att1" LIKE ? and "att1" in (?))))';
+        $sql = 'select * from "test" where ((("test"."att1" LIKE ? and "test"."att1" LIKE ? and "test"."att1" in (?))))';
 
         $this->assertEquals($sql, $this->builder->toSql());
     }
@@ -123,7 +123,7 @@ class ApiQueryTest extends TestCase
         $jsonQuery = new ApiQuery($this->builder, $input);
         $jsonQuery->search();
 
-        $sql = 'select * from "test" where ((("att1" in (?))) and (("att2" < ?)) and (("att3" <= ?)) and (("att4" > ?)) and (("att5" >= ?)) and (("att6" between ? and ?)) and (("att7" not between ? and ?)) and (("att8" not in (?))))';
+        $sql = 'select * from "test" where ((("test"."att1" in (?))) and (("test"."att2" < ?)) and (("test"."att3" <= ?)) and (("test"."att4" > ?)) and (("test"."att5" >= ?)) and (("test"."att6" between ? and ?)) and (("test"."att7" not between ? and ?)) and (("test"."att8" not in (?))))';
 
         $this->assertEquals($sql, $this->builder->toSql());
     }
@@ -212,7 +212,7 @@ class ApiQueryTest extends TestCase
         $jsonQuery = new ApiQuery($this->builder, $input);
         $jsonQuery->search();
 
-        $sql = 'select * from "test" order by "att1" asc, "att2" desc, "att3" asc';
+        $sql = 'select * from "test" order by "test"."att1" asc, "test"."att2" desc, "test"."att3" asc';
 
         $this->assertEquals($sql, $this->builder->toSql());
     }
@@ -227,9 +227,72 @@ class ApiQueryTest extends TestCase
         $jsonQuery = new ApiQuery($this->builder, $input);
         $jsonQuery->search();
 
-        $sql = 'select * from "test" group by "att1", "att2"';
+        $sql = 'select * from "test" group by "test"."att1", "test"."att2"';
 
         $this->assertEquals($sql, $this->builder->toSql());
+    }
+
+    /** @test */
+    public function qualifies_group_by_columns_when_ordering_by_relation()
+    {
+        $input = [
+            'group_by' => ['created_at'],
+            'order_by' => [
+                'company.id' => 'asc',
+            ],
+        ];
+
+        $jsonQuery = new ApiQuery($this->builder, $input);
+        $jsonQuery->search();
+
+        $sql = $this->builder->toSql();
+
+        $this->assertStringContainsString('left join "companies"', strtolower($sql));
+        $this->assertStringContainsString('group by "test"."created_at"', $sql);
+    }
+
+    /** @test */
+    public function qualifies_simple_returns_columns_but_not_raw_expressions_when_ordering_by_relation()
+    {
+        $input = [
+            'returns' => ['id', 'count:status'],
+            'order_by' => [
+                'company.id' => 'asc',
+            ],
+        ];
+
+        $jsonQuery = new ApiQuery($this->builder, $input);
+        $jsonQuery->search();
+
+        $sql = $this->builder->toSql();
+
+        $this->assertStringContainsString('"test"."id"', $sql);
+        $this->assertStringContainsString('count("status") as count_status', $sql);
+        $this->assertStringNotContainsString('"test".count("status")', $sql);
+    }
+
+    /** @test */
+    public function qualifies_custom_field_identificator_when_ordering_by_relation()
+    {
+        $input = [
+            'search' => [
+                '&&_INC_CF' => [
+                    'custom_field_id' => '5',
+                    'value' => 'EQ:test',
+                ],
+            ],
+            'order_by' => [
+                'company.id' => 'asc',
+            ],
+        ];
+
+        $jsonQuery = new ApiQuery($this->builder, $input);
+        $jsonQuery->search();
+
+        $sql = $this->builder->toSql();
+
+        $this->assertStringContainsString('"test"."custom_field_id" = ?', $sql);
+        $this->assertStringContainsString('"test"."value" in (?)', $sql);
     }
 
     /** @test */
@@ -278,7 +341,7 @@ class ApiQueryTest extends TestCase
         $jsonQuery = new ApiQuery($this->builder, $input);
         $jsonQuery->search();
 
-        $sql = 'select * from "test" where ((("att1" in (?))) or (("att2" in (?))))';
+        $sql = 'select * from "test" where ((("test"."att1" in (?))) or (("test"."att2" in (?))))';
 
         $this->assertEquals($sql, $this->builder->toSql());
     }
@@ -302,7 +365,7 @@ class ApiQueryTest extends TestCase
         $jsonQuery = new ApiQuery($this->builder, $input);
         $jsonQuery->search();
 
-        $sql = 'select * from "test" where ((("att1" in (?))) or (("att2" in (?))) and (("att3" in (?))) and (("att4" in (?))))';
+        $sql = 'select * from "test" where ((("test"."att1" in (?))) or (("test"."att2" in (?))) and (("test"."att3" in (?))) and (("test"."att4" in (?))))';
 
         $this->assertEquals($sql, $this->builder->toSql());
     }
@@ -339,9 +402,30 @@ class ApiQueryTest extends TestCase
         $jsonQuery = new ApiQuery($this->builder, $input);
         $jsonQuery->search();
 
-        $sql = 'select * from "test" where ((((("test"."id" in (?)) or ("test"."id" in (?))) and (("name" in (?)))) or ((("test"."id" in (?))) and (("name" LIKE ? and "name" LIKE ?)))) and ((("we" in (?)))) or (("love" < ?)) or (("recursion" in (?))))';
+        $sql = 'select * from "test" where ((((("test"."id" in (?)) or ("test"."id" in (?))) and (("test"."name" in (?)))) or ((("test"."id" in (?))) and (("test"."name" LIKE ? and "test"."name" LIKE ?)))) and ((("test"."we" in (?)))) or (("test"."love" < ?)) or (("test"."recursion" in (?))))';
 
         $this->assertEquals($sql, $this->builder->toSql());
+    }
+
+    /** @test */
+    public function qualifies_main_model_search_columns_when_ordering_by_relation()
+    {
+        $input = [
+            'search' => [
+                'created_at' => 'BT:2026-06-12 00:00:00;2026-06-12 23:59:59',
+            ],
+            'order_by' => [
+                'company.id' => 'asc',
+            ],
+        ];
+
+        $jsonQuery = new ApiQuery($this->builder, $input);
+        $jsonQuery->search();
+
+        $sql = $this->builder->toSql();
+
+        $this->assertStringContainsString('left join "companies"', strtolower($sql));
+        $this->assertStringContainsString('"test"."created_at" between ? and ?', $sql);
     }
 
     /** @test */
@@ -394,6 +478,26 @@ class ApiQueryTest extends TestCase
 
         $this->assertStringContainsString('exists (select * from "related"', $sql);
         $this->assertStringContainsString('"description" in (?)', $sql);
+        $this->assertStringNotContainsString('"test"."description"', $sql);
+    }
+
+    /** @test */
+    public function search_by_belongs_to_relation_column_uses_related_table_not_parent()
+    {
+        $input = [
+            'search' => [
+                'company.id' => 'EQ:1',
+            ],
+        ];
+
+        $jsonQuery = new ApiQuery($this->builder, $input);
+        $jsonQuery->search();
+
+        $sql = $this->builder->toSql();
+
+        $this->assertStringContainsString('exists (select * from "companies"', $sql);
+        $this->assertStringContainsString('"id" in (?)', $sql);
+        $this->assertStringNotContainsString('"test"."id" in (?)', $sql);
     }
 
     /** @test */
