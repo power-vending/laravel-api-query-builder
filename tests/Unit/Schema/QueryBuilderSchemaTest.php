@@ -7,6 +7,7 @@ namespace PowerVending\LaravelApiQueryBuilder\Tests\Unit\Schema;
 use Illuminate\Support\Facades\Schema;
 use PowerVending\LaravelApiQueryBuilder\Exceptions\InvalidRelationException;
 use PowerVending\LaravelApiQueryBuilder\Schema\QueryBuilderSchema;
+use PowerVending\LaravelApiQueryBuilder\SearchCallbacks\{Equals, GreaterThan, NotEquals};
 use PowerVending\LaravelApiQueryBuilder\Tests\{TestCase, TestModel};
 
 class QueryBuilderSchemaTest extends TestCase
@@ -84,6 +85,90 @@ class QueryBuilderSchemaTest extends TestCase
     }
 
     /** @test */
+    public function uses_cast_operators_when_configured_for_column_type()
+    {
+        config(['api-query-builder.cast_operators' => [
+            'integer' => [Equals::class, NotEquals::class],
+        ]]);
+
+        Schema::shouldReceive('hasTable')->andReturn(true);
+        Schema::shouldReceive('getColumns')->with('test')->andReturn([
+            ['name' => 'age', 'type' => 'integer', 'nullable' => false],
+        ]);
+
+        $schema = QueryBuilderSchema::forModel(new TestModel(), []);
+        $operators = $schema['searchable_columns']['age']['operators'];
+
+        $this->assertEquals(['EQ', 'NE'], $operators);
+        $this->assertNotContains('LT', $operators);
+        $this->assertNotContains('GT', $operators);
+        $this->assertNotContains('LIKE', $operators);
+    }
+
+    /** @test */
+    public function cast_operators_result_is_sorted_alphabetically()
+    {
+        config(['api-query-builder.cast_operators' => [
+            'integer' => [NotEquals::class, Equals::class, GreaterThan::class],
+        ]]);
+
+        Schema::shouldReceive('hasTable')->andReturn(true);
+        Schema::shouldReceive('getColumns')->with('test')->andReturn([
+            ['name' => 'score', 'type' => 'integer', 'nullable' => false],
+        ]);
+
+        $schema = QueryBuilderSchema::forModel(new TestModel(), []);
+        $operators = $schema['searchable_columns']['score']['operators'];
+
+        $this->assertEquals(['EQ', 'GT', 'NE'], $operators);
+    }
+
+    /** @test */
+    public function falls_back_to_normal_flow_when_type_not_in_cast_operators()
+    {
+        config(['api-query-builder.cast_operators' => [
+            'boolean' => [Equals::class],
+        ]]);
+
+        Schema::shouldReceive('hasTable')->andReturn(true);
+        Schema::shouldReceive('getColumns')->with('test')->andReturn([
+            ['name' => 'age', 'type' => 'integer', 'nullable' => false],
+        ]);
+
+        $schema = QueryBuilderSchema::forModel(new TestModel(), []);
+        $operators = $schema['searchable_columns']['age']['operators'];
+
+        // Normal comparable-type flow for integer
+        $this->assertContains('EQ', $operators);
+        $this->assertContains('LT', $operators);
+        $this->assertContains('GT', $operators);
+        $this->assertNotContains('LIKE', $operators);
+    }
+
+    /** @test */
+    public function uses_cast_operators_when_key_is_a_class_name()
+    {
+        $castClass = 'App\\Casts\\DynamicConfiguration';
+
+        config(['api-query-builder.cast_operators' => [
+            $castClass => [Equals::class, NotEquals::class],
+        ]]);
+
+        Schema::shouldReceive('hasTable')->andReturn(true);
+        Schema::shouldReceive('getColumns')->with('test')->andReturn([
+            // Type is the raw class name, as returned by getTypeFromCast() for custom casts
+            ['name' => 'config', 'type' => $castClass, 'nullable' => false],
+        ]);
+
+        $schema = QueryBuilderSchema::forModel(new TestModel(), []);
+        $operators = $schema['searchable_columns']['config']['operators'];
+
+        $this->assertEquals(['EQ', 'NE'], $operators);
+        $this->assertNotContains('LT', $operators);
+        $this->assertNotContains('LIKE', $operators);
+    }
+
+    /** @test */
     public function throws_invalid_relation_exception_when_relation_does_not_exist()
     {
         Schema::shouldReceive('hasTable')->andReturn(true);
@@ -99,5 +184,29 @@ class QueryBuilderSchemaTest extends TestCase
         $this->expectExceptionMessage("Relation 'invalid' does not exist on model '");
 
         QueryBuilderSchema::forModel(new TestModel(), ['related.invalid']);
+    }
+
+    /** @test */
+    public function throws_invalid_relation_exception_when_relation_is_forbidden_by_model_options()
+    {
+        config(['api-query-builder.model_options' => [
+            TestModel::class => [
+                'forbidden_relations' => ['tags'],
+            ],
+        ]]);
+
+        Schema::shouldReceive('hasTable')->andReturn(true);
+        Schema::shouldReceive('getColumns')->andReturnUsing(function (string $table) {
+            return match ($table) {
+                'test' => [['name' => 'id', 'type' => 'int', 'nullable' => false]],
+                'related' => [['name' => 'id', 'type' => 'int', 'nullable' => false]],
+                default => [],
+            };
+        });
+
+        $this->expectException(InvalidRelationException::class);
+        $this->expectExceptionMessage("Relation 'tags' does not exist on model '");
+
+        QueryBuilderSchema::forModel(new TestModel(), ['tags']);
     }
 }

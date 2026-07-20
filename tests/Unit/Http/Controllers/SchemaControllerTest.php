@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace PowerVending\LaravelApiQueryBuilder\Tests\Unit\Http\Controllers;
 
 use Illuminate\Support\Facades\Schema;
+use PowerVending\LaravelApiQueryBuilder\Exceptions\InvalidRelationException;
 use PowerVending\LaravelApiQueryBuilder\Http\Controllers\SchemaController;
 use PowerVending\LaravelApiQueryBuilder\Http\Requests\SchemaRequest;
 use PowerVending\LaravelApiQueryBuilder\Tests\{TestCase, TestModel};
@@ -94,5 +95,72 @@ class SchemaControllerTest extends TestCase
         $this->assertArrayHasKey('related', $payload['relations']);
         $this->assertArrayHasKey('company', $payload['relations']);
         $this->assertArrayHasKey('tags', $payload['relations']);
+    }
+
+    /** @test */
+    public function does_not_auto_discover_relations_defined_as_forbidden_in_model_options()
+    {
+        config(['api-query-builder.resource_models' => [
+            'tests' => 'schema.controller.test.model',
+        ]]);
+
+        config(['api-query-builder.model_options' => [
+            TestModel::class => [
+                'forbidden_relations' => ['tags'],
+            ],
+        ]]);
+
+        $this->app->instance('schema.controller.test.model', new TestModel());
+
+        Schema::shouldReceive('hasTable')->andReturn(true);
+        Schema::shouldReceive('getColumns')->andReturnUsing(function (string $table) {
+            return match ($table) {
+                'test' => [['name' => 'id', 'type' => 'int', 'nullable' => false]],
+                'related' => [['name' => 'id', 'type' => 'int', 'nullable' => false]],
+                'companies' => [['name' => 'id', 'type' => 'int', 'nullable' => false]],
+                default => [],
+            };
+        });
+
+        $controller = new SchemaController();
+        $request = SchemaRequest::create('/schema', 'GET');
+
+        $response = $controller->show($request, 'tests');
+        $payload = $response->getData(true);
+
+        $this->assertArrayHasKey('related', $payload['relations']);
+        $this->assertArrayHasKey('company', $payload['relations']);
+        $this->assertArrayNotHasKey('tags', $payload['relations']);
+    }
+
+    /** @test */
+    public function throws_when_requested_relation_is_forbidden_by_global_config()
+    {
+        config(['api-query-builder.resource_models' => [
+            'tests' => 'schema.controller.test.model',
+        ]]);
+
+        config(['api-query-builder.global_forbidden_relations' => ['company']]);
+        config(['api-query-builder.model_options' => []]);
+
+        $this->app->instance('schema.controller.test.model', new TestModel());
+
+        Schema::shouldReceive('hasTable')->andReturn(true);
+        Schema::shouldReceive('getColumns')->andReturnUsing(function (string $table) {
+            return match ($table) {
+                'test' => [['name' => 'id', 'type' => 'int', 'nullable' => false]],
+                'related' => [['name' => 'id', 'type' => 'int', 'nullable' => false]],
+                'companies' => [['name' => 'id', 'type' => 'int', 'nullable' => false]],
+                default => [],
+            };
+        });
+
+        $controller = new SchemaController();
+        $request = SchemaRequest::create('/schema', 'GET', ['relations' => ['company']]);
+
+        $this->expectException(InvalidRelationException::class);
+        $this->expectExceptionMessage("Relation 'company' does not exist on model '");
+
+        $controller->show($request, 'tests');
     }
 }

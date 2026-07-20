@@ -6,6 +6,7 @@ namespace PowerVending\LaravelApiQueryBuilder\Tests\Unit\RequestParameters;
 
 use Exception;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Mockery;
 use PowerVending\LaravelApiQueryBuilder\Config\ModelConfig;
 use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
@@ -134,6 +135,27 @@ class OrderByParameterTest extends TestCase
 
         // Should order by the last relation table column
         $this->assertStringContainsString('order by "nested"."name" asc', $sql);
+    }
+
+    /** @test */
+    public function qualifies_only_simple_select_columns_when_joining_for_relation_order()
+    {
+        $model = new \PowerVending\LaravelApiQueryBuilder\Tests\TestModel();
+        $builder = $model->newQuery();
+        $builder->addSelect('id', DB::raw('DATE(created_at) as created_date'));
+        $modelConfig = new ModelConfig($model);
+
+        (new OrderByParameter(
+            ['related.name' => 'desc'],
+            $builder,
+            $modelConfig
+        ))->run();
+
+        $sql = $builder->toSql();
+
+        $this->assertStringContainsString('"test"."id"', $sql);
+        $this->assertStringContainsString('DATE(created_at) as created_date', $sql);
+        $this->assertStringNotContainsString('"test".DATE(created_at)', $sql);
     }
 
     /** @test */

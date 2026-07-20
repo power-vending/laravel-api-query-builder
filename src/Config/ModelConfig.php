@@ -8,6 +8,7 @@ use Exception;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
+use PowerVending\LaravelApiQueryBuilder\Support\RelationMethodNormalizer;
 
 class ModelConfig
 {
@@ -44,12 +45,12 @@ class ModelConfig
 
     public function hasConfig(): bool
     {
-        return array_key_exists(get_class($this->model), config('api-query-builder.model_options'));
+        return array_key_exists(get_class($this->model), (array) config('api-query-builder.model_options', []));
     }
 
     protected function getConfig(): array
     {
-        return config('api-query-builder.model_options.' . get_class($this->model));
+        return (array) config('api-query-builder.model_options.' . get_class($this->model), []);
     }
 
     public function getReturns(): array
@@ -91,6 +92,61 @@ class ModelConfig
         return $forbiddenKeys;
     }
 
+    public function getForbiddenRelations(array $forbiddenRelations): array
+    {
+        if (property_exists($this->model, 'apiQueryBuilderForbiddenRelations')) {
+            $reflection = new \ReflectionClass($this->model);
+
+            if ($reflection->hasProperty('apiQueryBuilderForbiddenRelations')) {
+                $property = $reflection->getProperty('apiQueryBuilderForbiddenRelations');
+                $modelForbiddenRelations = $property->getValue($this->model);
+
+                if (is_array($modelForbiddenRelations) && !empty($modelForbiddenRelations)) {
+                    $forbiddenRelations = array_merge($forbiddenRelations, $modelForbiddenRelations);
+                }
+            }
+        }
+
+        if (array_key_exists('forbidden_relations', $this->config) && $this->config['forbidden_relations']) {
+            $forbiddenRelations = array_merge($forbiddenRelations, $this->config['forbidden_relations']);
+        }
+
+        $normalized = [];
+
+        foreach ($forbiddenRelations as $relationPath) {
+            if (!is_string($relationPath)) {
+                continue;
+            }
+
+            $normalizedPath = $this->normalizeRelationPath($relationPath);
+
+            if ($normalizedPath !== null) {
+                $normalized[] = $normalizedPath;
+            }
+        }
+
+        return array_values(array_unique($normalized));
+    }
+
+    public function isRelationForbidden(string $relationPath, array $globalForbiddenRelations = []): bool
+    {
+        $normalizedPath = $this->normalizeRelationPath($relationPath);
+
+        if ($normalizedPath === null) {
+            return false;
+        }
+
+        $forbiddenRelations = $this->getForbiddenRelations($globalForbiddenRelations);
+
+        foreach ($forbiddenRelations as $forbiddenPath) {
+            if ($normalizedPath === $forbiddenPath || str_starts_with($normalizedPath, $forbiddenPath . '.')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     protected function getEloquentExclusion($forbiddenKeys): array
     {
         if (!array_key_exists('eloquent_exclusion', $this->config) || !$this->config['eloquent_exclusion']) {
@@ -111,11 +167,11 @@ class ModelConfig
 
     protected function getForbiddenColumns(array $forbiddenKeys): array
     {
-        if (property_exists($this->model, 'forbiddenColumns')) {
+        if (property_exists($this->model, 'apiQueryBuilderForbiddenColumns')) {
             $reflection = new \ReflectionClass($this->model);
 
-            if ($reflection->hasProperty('forbiddenColumns')) {
-                $property = $reflection->getProperty('forbiddenColumns');
+            if ($reflection->hasProperty('apiQueryBuilderForbiddenColumns')) {
+                $property = $reflection->getProperty('apiQueryBuilderForbiddenColumns');
                 $modelForbidden = $property->getValue($this->model);
 
                 if (is_array($modelForbidden) && !empty($modelForbidden)) {
@@ -175,6 +231,29 @@ class ModelConfig
         }
 
         return $cast !== '' ? $cast : null;
+    }
+
+    protected function normalizeRelationPath(string $relationPath): ?string
+    {
+        $segments = array_values(array_filter(explode('.', trim($relationPath)), fn (string $segment) => $segment !== ''));
+
+        if ($segments === []) {
+            return null;
+        }
+
+        $normalizedSegments = [];
+
+        foreach ($segments as $segment) {
+            $normalizedSegment = RelationMethodNormalizer::normalize($segment);
+
+            if ($normalizedSegment === null) {
+                return null;
+            }
+
+            $normalizedSegments[] = $normalizedSegment;
+        }
+
+        return implode('.', $normalizedSegments);
     }
 
     protected function registerEnumTypeForDoctrine($connection): void

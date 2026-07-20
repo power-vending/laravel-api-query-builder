@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Mockery;
 use PowerVending\LaravelApiQueryBuilder\Config\ModelConfig;
 use PowerVending\LaravelApiQueryBuilder\RequestParameters\GroupByParameter;
-use PowerVending\LaravelApiQueryBuilder\Tests\TestCase;
+use PowerVending\LaravelApiQueryBuilder\Tests\{TestCase, TestModel};
 
 class GroupByParameterTest extends TestCase
 {
@@ -65,5 +65,24 @@ class GroupByParameterTest extends TestCase
         $query = 'select * group by "1"';
 
         $this->assertEquals($query, $this->builder->toSql());
+    }
+
+    /** @test */
+    public function qualifies_columns_with_model_table()
+    {
+        $model = new TestModel();
+        $builder = $model->newQuery();
+        $modelConfig = new ModelConfig($model);
+
+        $groupByParameter = new GroupByParameter(
+            ['created_at', 'status'],
+            $builder,
+            $modelConfig
+        );
+        $groupByParameter->run();
+
+        $query = 'select * from "test" group by "test"."created_at", "test"."status"';
+
+        $this->assertEquals($query, $builder->toSql());
     }
 }

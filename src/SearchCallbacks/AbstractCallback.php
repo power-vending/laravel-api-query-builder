@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace PowerVending\LaravelApiQueryBuilder\SearchCallbacks;
 
@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 use PDO;
 use PowerVending\LaravelApiQueryBuilder\{CategorizedValues, CustomFieldSearchParser, SearchParserInterface};
 use PowerVending\LaravelApiQueryBuilder\Exceptions\{ApiQueryBuilderException, InvalidOperatorUsageException};
+use PowerVending\LaravelApiQueryBuilder\Support\ColumnQualifier;
 
 abstract class AbstractCallback
 {
@@ -50,7 +51,8 @@ abstract class AbstractCallback
                 $this->appendRelations($builder, $this->searchParser->column, $this->categorizedValues);
             },
             function (Builder $builder) {
-                $this->execute($builder, $this->searchParser->column, $this->categorizedValues);
+                $column = ColumnQualifier::qualify($builder, $this->searchParser->column);
+                $this->execute($builder, $column, $this->categorizedValues);
                 $this->checkExecuteForCustomfieldsParameter($builder);
             }
         );
@@ -267,7 +269,8 @@ abstract class AbstractCallback
     protected function checkExecuteForCustomfieldsParameter($builder)
     {
         if ($this->searchParser instanceof CustomFieldSearchParser) {
-            $builder->where($this->searchParser->cf_field_identificator, '=', $this->searchParser->cf_field_value);
+            $field = ColumnQualifier::qualify($builder, $this->searchParser->cf_field_identificator);
+            $builder->where($field, '=', $this->searchParser->cf_field_value);
         }
     }
 }

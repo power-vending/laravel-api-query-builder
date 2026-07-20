@@ -9,9 +9,11 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Str;
+use PowerVending\LaravelApiQueryBuilder\Config\ModelConfig;
 use PowerVending\LaravelApiQueryBuilder\Exceptions\InvalidRelationException;
 use PowerVending\LaravelApiQueryBuilder\Http\Requests\SchemaRequest;
 use PowerVending\LaravelApiQueryBuilder\Schema\QueryBuilderSchema;
+use PowerVending\LaravelApiQueryBuilder\Support\RelationMethodNormalizer;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class SchemaController
@@ -34,17 +36,48 @@ class SchemaController
         $relations = $this->mergeAndExpandRelations($model, $default_relations, $requested_relations);
 
         $schema = QueryBuilderSchema::forModel($model, $relations);
+        $schema['relations'] = $this->sortRelationNodesRecursively($schema['relations'] ?? []);
 
         return response()->json($schema);
+    }
+
+    private function sortRelationNodesRecursively(array $relations): array
+    {
+        if ($relations === []) {
+            return $relations;
+        }
+
+        ksort($relations);
+
+        foreach ($relations as $relation_name => $relation_schema) {
+            if (!is_array($relation_schema)) {
+                continue;
+            }
+
+            $relation_schema['relations'] = $this->sortRelationNodesRecursively(
+                is_array($relation_schema['relations'] ?? null) ? $relation_schema['relations'] : []
+            );
+
+            $relations[$relation_name] = $relation_schema;
+        }
+
+        return $relations;
     }
 
     private function discoverModelRelations(Model $model): array
     {
         $relations = [];
         $reflection = new \ReflectionClass($model);
+        $modelConfig = new ModelConfig($model);
+        $globalForbiddenRelations = Config::get('api-query-builder.global_forbidden_relations', []);
 
         foreach ($reflection->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
-            if ($method->isStatic() || $method->getDeclaringClass()->getName() !== get_class($model)) {
+            if (
+                $method->isStatic()
+                || $method->getDeclaringClass()->getName() !== get_class($model)
+                || str_starts_with($method->getName(), '_')
+                || $modelConfig->isRelationForbidden($method->getName(), $globalForbiddenRelations)
+            ) {
                 continue;
             }
 
@@ -108,11 +141,17 @@ class SchemaController
         }
 
         $current_model = $model;
+        $globalForbiddenRelations = Config::get('api-query-builder.global_forbidden_relations', []);
 
         foreach ($segments as $segment) {
-            $method = Str::camel($segment);
+            $method = RelationMethodNormalizer::normalize($segment);
+            $modelConfig = new ModelConfig($current_model);
 
-            if (!method_exists($current_model, $method)) {
+            if (
+                $method === null
+                || $modelConfig->isRelationForbidden($method, $globalForbiddenRelations)
+                || !method_exists($current_model, $method)
+            ) {
                 return null;
             }
 

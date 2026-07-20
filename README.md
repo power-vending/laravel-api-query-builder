@@ -12,12 +12,17 @@
 8. [Uso básico](#uso-básico)
 9. [Parâmetros disponíveis](#parâmetros-disponíveis)
 10. [Trabalhando com relacionamentos](#trabalhando-com-relacionamentos)
+    - [Sub-search nested (busca aninhada)](#sub-search-nested-busca-aninhada)
+    - [Falsos positivos na notação com ponto](#falsos-positivos-na-notação-com-ponto)
+    - [Guia de decisão: notação com ponto vs. sub-search nested](#guia-de-decisão-notação-com-ponto-vs-sub-search-nested)
 11. [Exemplos práticos completos](#exemplos-práticos-completos)
 12. [Customizações avançadas](#customizações-avançadas)
+    - [Sistema de tipos (`types`)](#sistema-de-tipos-types)
+    - [Operadores por cast (`cast_operators`)](#operadores-por-cast-cast_operators)
+    - [Como `types` e `cast_operators` trabalham juntos](#como-types-e-cast_operators-trabalham-juntos)
 13. [Erros retornados pela API](#erros-retornados-pela-api)
 14. [Solução de problemas](#solução-de-problemas)
 15. [Testes](#testes)
-16. [Créditos e licença](#créditos-e-licença)
 
 ---
 
@@ -163,6 +168,12 @@ return [
         'password',
         'remember_token',
     ],
+
+    // Relacionamentos que nunca podem ser carregados ou expostos por schema
+    'global_forbidden_relations' => [
+        'internalRelation',
+        'company.users',
+    ],
     
     // Outras configurações...
 ];
@@ -222,7 +233,7 @@ class User extends Model
     /**
      * Colunas que não podem ser acessadas via API query
      */
-    protected $forbiddenColumns = [
+    protected $apiQueryBuilderForbiddenColumns = [
         'password',
         'remember_token',
         'two_factor_secret',
@@ -233,10 +244,53 @@ class User extends Model
 
 **Ordem de precedência das colunas proibidas:**
 1. `global_forbidden_columns` (config) - aplica a todos os models
-2. `$forbiddenColumns` (model) - específico da model
+2. `$apiQueryBuilderForbiddenColumns` (model) - específico da model
 3. `model_options[Model::class]['forbidden_columns']` (config) - sobrescreve tudo
 
-**IMPORTANTE:** As três fontes são mescladas (união). Se quiser usar apenas config, não defina `$forbiddenColumns` na model.
+**IMPORTANTE:** As três fontes são mescladas (união). Se quiser usar apenas config, não defina `$apiQueryBuilderForbiddenColumns` na model.
+
+### Configurando relacionamentos proibidos
+
+Assim como colunas, você pode bloquear relacionamentos específicos para evitar que o schema os auto-descubra ou que o frontend peça carregamento deles.
+
+```php
+'global_forbidden_relations' => [
+    'internalRelation',
+    'company.users',
+],
+```
+
+Também é possível restringir relacionamentos por model via `model_options`:
+
+```php
+'model_options' => [
+    \App\Models\User::class => [
+        'forbidden_relations' => ['profile', 'company'],
+    ],
+],
+```
+
+Além da configuração, você também pode declarar a propriedade `$apiQueryBuilderForbiddenRelations` diretamente no model:
+
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class User extends Model
+{
+    protected $apiQueryBuilderForbiddenRelations = [
+        'profile',
+        'company.users',
+    ];
+}
+```
+
+As três fontes são mescladas (união): `global_forbidden_relations`, `model_options[Model::class]['forbidden_relations']` e `$apiQueryBuilderForbiddenRelations`.
+
+Relacionamentos proibidos são tratados como inexistentes: o schema não os carrega automaticamente e qualquer tentativa de requestar esses relacionamentos gera erro de relation not found.
 
 ### Passo 5: Configurar estrutura de rotas do pacote
 
@@ -1389,6 +1443,7 @@ O pacote suporta **busca**, **ordenação** e **carregamento** através de relac
 - `BelongsTo` (Pertence a)
 - `HasOne` (Tem um)
 - `HasMany` (Tem muitos)
+- `BelongsToMany` (Muitos para muitos)
 
 ### Busca em campos de relacionamentos
 
@@ -1422,15 +1477,20 @@ class Product extends Model
 }
 ```
 
-**SQL gerado:**
+**SQL gerado (via subconsulta `EXISTS` / `whereHas`):**
 
 ```sql
 SELECT products.*
 FROM products
-LEFT JOIN categories ON products.category_id = categories.id
-WHERE categories.name LIKE '%Electronics%'
-  AND products.price > 100
+WHERE products.price > 100
+  AND EXISTS (
+    SELECT * FROM categories
+    WHERE products.category_id = categories.id
+      AND categories.name LIKE '%Electronics%'
+  )
 ```
+
+> **Nota:** A busca com notação de ponto no parâmetro `search` usa `whereHas`/`EXISTS`, não `LEFT JOIN`. O `LEFT JOIN` é usado pelo parâmetro `order_by` quando há notação de ponto. Veja [Falsos positivos na notação com ponto](#falsos-positivos-na-notação-com-ponto) para entender quando essa diferença importa.
 
 #### Busca em múltiplos níveis de relacionamento
 
@@ -1445,6 +1505,174 @@ Você pode buscar em relacionamentos aninhados:
     "relations": ["category.parent", "store.city"]
 }
 ```
+
+### Sub-search nested (busca aninhada)
+
+Além da notação com ponto (`relation.column`), o pacote suporta **sub-search nested**: filtros aninhados em que a chave do `search` é o nome de um relacionamento e o valor é um objeto com os parâmetros da query a aplicar **dentro** desse relacionamento.
+
+Internamente, isso gera `whereHas` (subconsulta `EXISTS`) no Eloquent — o mesmo mecanismo usado pela notação com ponto, mas com todas as condições agrupadas em um único subquery sobre o relacionamento.
+
+#### Sintaxe
+
+```json
+{
+    "search": {
+        "relationName": {
+            "search": {
+                "column": "OPERADOR:valor"
+            }
+        }
+    }
+}
+```
+
+O objeto aninhado aceita os mesmos parâmetros de uma query normal (`search`, `order_by`, operadores lógicos `&&`/`||`, etc.), aplicados ao model do relacionamento.
+
+> **Obrigatório:** As condições de filtro devem ficar dentro da chave `search`. Se você passar colunas diretamente no objeto do relacionamento (sem `search`), o pacote ainda executa o `whereHas`, mas **não aplica nenhum filtro** dentro dele — o que equivale a “tem pelo menos um registro relacionado”.
+
+#### Exemplo: filtrar registros principais por um relacionamento
+
+**Models (exemplo genérico):**
+
+```php
+class Record extends Model
+{
+    use ApiQueryBuilder;
+
+    public function entries()
+    {
+        return $this->hasMany(Entry::class);
+    }
+}
+```
+
+**JSON — sub-search nested:**
+
+```json
+{
+    "search": {
+        "entries": {
+            "search": {
+                "status": "EQ:active",
+                "score": "GE:80"
+            }
+        }
+    }
+}
+```
+
+**SQL gerado (simplificado):**
+
+```sql
+SELECT records.*
+FROM records
+WHERE EXISTS (
+    SELECT * FROM entries
+    WHERE entries.record_id = records.id
+      AND entries.status IN ('active')
+      AND entries.score >= 80
+)
+```
+
+Todas as condições dentro de `entries.search` precisam ser satisfeitas pelo **mesmo** registro em `entries`.
+
+#### Exemplo: relacionamento aninhado em múltiplos níveis
+
+```json
+{
+    "search": {
+        "container": {
+            "search": {
+                "owner.name": "LIKE:Smith"
+            }
+        }
+    }
+}
+```
+
+#### Exemplo: relacionamento many-to-many
+
+```json
+{
+    "search": {
+        "tags": {
+            "search": {
+                "slug": "EQ:featured"
+            }
+        }
+    }
+}
+```
+
+### Falsos positivos na notação com ponto
+
+Ao aplicar **múltiplas condições sobre o mesmo relacionamento** usando notação com ponto — ou seja, várias chaves `relation.column` distintas no mesmo `search` —, cada chave gera uma subconsulta `EXISTS` (`whereHas`) **independente**.
+
+Em relacionamentos com **mais de um registro relacionado** (`HasMany`, `BelongsToMany`), condições distintas podem ser satisfeitas por **registros diferentes** do relacionamento. O registro principal aparece nos resultados mesmo que **nenhum** registro relacionado individual satisfaça todas as condições ao mesmo tempo.
+
+#### Exemplo do problema
+
+Considere um `Record` com duas `entries`:
+
+| entry | status | score |
+|-------|--------|-------|
+| A     | active | 50    |
+| B     | draft  | 90    |
+
+**Busca com notação com ponto (incorreta para este caso):**
+
+```json
+{
+    "search": {
+        "entries.status": "EQ:active",
+        "entries.score": "GE:80"
+    }
+}
+```
+
+**Por que retorna o registro (falso positivo):**
+
+- `entries.status = active` → satisfeito pela entry A
+- `entries.score >= 80` → satisfeito pela entry B
+- Nenhuma entry satisfaz **ambas** as condições, mas o `Record` é retornado
+
+**Busca correta com sub-search nested:**
+
+```json
+{
+    "search": {
+        "entries": {
+            "search": {
+                "status": "EQ:active",
+                "score": "GE:80"
+            }
+        }
+    }
+}
+```
+
+Aqui as condições são avaliadas dentro de um único `whereHas` — apenas registros com pelo menos uma entry que satisfaça **todas** as condições são retornados.
+
+#### Campos do model principal
+
+Este problema **não se aplica** a múltiplas condições em colunas do model principal (sem notação de ponto). Condições como `"status": "EQ:active"` e `"score": "GE:80"` no mesmo `search` são aplicadas diretamente na mesma linha da tabela principal via `WHERE` — não há risco de falsos positivos por registros distintos.
+
+Da mesma forma, combinar operadores na **mesma coluna** (ex.: `"name": "EQ:foo%&&EQ:%bar"`) também avalia todas as condições sobre o mesmo valor/campo.
+
+> **Nota sobre `order_by`:** A ordenação por relacionamento com notação de ponto usa `LEFT JOIN` e pode causar duplicação de linhas em `HasMany`/`BelongsToMany` (veja [Limitações e boas práticas](#limitações-e-boas-práticas)). Esse é um problema distinto, relacionado à listagem/ordenação, não à semântica de filtro descrita acima.
+
+### Guia de decisão: notação com ponto vs. sub-search nested
+
+| Cenário | Abordagem recomendada |
+|---------|----------------------|
+| Uma única condição em um relacionamento (`relation.column`) | Notação com ponto |
+| Relacionamento `BelongsTo` / `HasOne` com múltiplas condições no mesmo relacionamento | Notação com ponto (há no máximo um registro relacionado) |
+| Relacionamento `HasMany` / `BelongsToMany` com **múltiplas condições** que devem valer para o **mesmo** registro relacionado | **Sub-search nested** (obrigatório) |
+| Filtros complexos dentro do relacionamento (agrupamentos `&&`/`||`, ordenação, etc.) | **Sub-search nested** |
+| Relacionamentos aninhados em vários níveis com várias condições no mesmo ramo | **Sub-search nested** (mais legível e semanticamente correto) |
+| Apenas carregar/filtrar dados do relacionamento no eager loading, sem afetar quais registros principais retornam | Objeto em `relations` (veja [Configurações avançadas de relacionamentos](#configurações-avançadas-de-relacionamentos)) |
+
+**Regra prática:** Se você precisa que duas ou mais condições sobre o **mesmo** relacionamento `HasMany`/`BelongsToMany` sejam verdadeiras para o **mesmo** registro filho, use sub-search nested. Use notação com ponto quando cada condição pode ser satisfeita independentemente ou quando há apenas um registro relacionado.
 
 ### Ordenação por relacionamento
 
@@ -1887,13 +2115,15 @@ class Product extends Model
 #### Limitações e boas práticas
 
 **✅ Suportado:**
-- Busca em campos de relacionamentos `BelongsTo`, `HasOne`
+- Busca em campos de relacionamentos `BelongsTo`, `HasOne`, `HasMany`, `BelongsToMany` (via notação com ponto ou sub-search nested)
 - Ordenação em campos de relacionamentos `BelongsTo`, `HasOne`
 - Múltiplos relacionamentos na mesma query
 - Relacionamentos aninhados (ex: `category.parent.name`)
+- Sub-search nested com `whereHas`/`EXISTS` para filtros semanticamente corretos em cardinalidade muitos
 
 **⚠️ Atenção:**
-- Relacionamentos `HasMany` podem gerar resultados duplicados
+- Múltiplas chaves `relation.column` no mesmo relacionamento `HasMany`/`BelongsToMany` podem gerar [falsos positivos](#falsos-positivos-na-notação-com-ponto) — prefira [sub-search nested](#sub-search-nested-busca-aninhada)
+- Relacionamentos `HasMany` em `order_by` podem gerar resultados duplicados (devido ao `LEFT JOIN`)
 - Use `returns` para evitar conflitos de coluna com mesmo nome
 - Sempre inclua o relacionamento no `relations` quando buscar/ordenar por ele
 
@@ -2315,6 +2545,215 @@ public function index(Request $request)
 }
 ```
 
+### Sistema de tipos (`types`)
+
+O sistema de **types** é o mecanismo responsável por preparar, transformar e validar os valores de busca enviados pelo frontend *antes* que a query SQL seja gerada. Isso garante que os dados cheguem ao banco no formato correto para comparação.
+
+Por exemplo:
+*   **Booleanos:** Transforma `"true"` ou `"1"` em um booleano real (`true`), evitando erros de tipo no banco.
+*   **JSON:** Aplica `json_encode` em objetos/arrays para que a comparação exata no banco de dados seja possível.
+
+#### Como o tipo de um campo é descoberto?
+O tipo da coluna é resolvido automaticamente na seguinte ordem de prioridade:
+1.  **Casts do Model:** O pacote verifica a propriedade `$casts` no Model (ex: `'boolean'`, ou um cast customizado como `App\Casts\DynamicConfiguration::class`).
+2.  **Schema do Banco de Dados:** Se não houver cast definido, ele consulta a coluna da tabela (ex: `varchar(191)`, `integer`, `json`).
+3.  **Fallback (`generic`):** Caso não encontre nenhuma informação, assume o tipo genérico `generic`.
+
+---
+
+#### Classes de Tipo Disponíveis
+
+Todas as classes de tipo estendem `AbstractType` (caminho: `src/Types/AbstractType.php`) e ficam sob o namespace `PowerVending\LaravelApiQueryBuilder\Types`.
+
+1.  **`AbstractType` (Classe Base Abstrata):**
+    É a classe mãe de todos os tipos. Define os métodos:
+    *   `abstract public static function name(): string`: Retorna o identificador do tipo (deve bater com o cast do Model ou tipo de coluna no banco).
+    *   `public function prepare(array $values, ?SearchParserInterface $searchParser = null): array`: Recebe a lista de valores a serem pesquisados e o parser da busca. Retorna os valores prontos para a query. Por padrão, retorna os valores inalterados.
+
+2.  **`BooleanType` (Validação Booleana):**
+    Identificado pelo nome `'boolean'`. Ele limpa e valida os valores booleano recebidos (como `true`, `false`, `1`, `0`, `yes`, `no`, `on`, `off`) convertendo-os para booleanos reais usando `filter_var()`. Se o valor for inválido, lança uma `ApiQueryBuilderException` com a mensagem `Wrong argument type provided`.
+
+3.  **`GenericType` (Fallback Padrão):**
+    Identificado pelo nome `'generic'`. Ele não altera nem valida os valores (apenas os retorna inalterados). Funciona como o comportamento padrão para qualquer tipo não mapeado explicitamente.
+
+---
+
+#### O Registry de Configuração e o lookup no `TypesConfig`
+
+O registro dos tipos ativos é feito no arquivo `config/api-query-builder.php` através da chave `types`:
+
+```php
+'types' => [
+    PowerVending\LaravelApiQueryBuilder\Types\GenericType::class,
+    PowerVending\LaravelApiQueryBuilder\Types\BooleanType::class,
+],
+```
+
+A classe `TypesConfig` (`src/Config/TypesConfig.php`) gerencia esse registro e resolve qual classe deve processar o valor através do método `getTypeClassFromTypeName(string $typeName)`.
+
+##### Fluxo de Resolução do Lookup:
+1.  **Verificação Direta:** Ele busca se o tipo resolvido (`$typeName`) está mapeado no registry de `types` (usando o retorno do método `name()`). Se encontrar, retorna a instância do tipo correspondente.
+2.  **Fallback para `generic`:** Se o tipo não estiver mapeado (por exemplo, um campo de texto sem cast registrado), ele verifica se o `GenericType` está registrado no registry. Se sim, retorna a instância do `GenericType`.
+3.  **Exceção:** Caso o tipo não esteja mapeado e o `GenericType` também não esteja registrado no registry, ele lança uma `ApiQueryBuilderException`: `"No valid callback for '$typeName' type."`.
+
+---
+
+#### Integração Interna com `CategorizedValues`
+
+Toda a transformação e distribuição de dados acontece no componente `CategorizedValues` (`src/CategorizedValues.php`).
+
+Quando o pacote processa um filtro, o `CategorizedValues` faz o seguinte:
+1.  **Identifica o Tipo:** No construtor, ele descobre o tipo apropriado usando o `TypesConfig`:
+    ```php
+    $this->type = (new TypesConfig())->getTypeClassFromTypeName($this->searchParser->type);
+    ```
+2.  **Categoriza os Valores:** Separa os valores de filtro em 4 grupos ("buckets") de acordo com os micro-operadores (como `!`, `%`, `null`, `!null`):
+    *   `$and`: Valores com match exato ou parcial positivo.
+    *   `$andLike`: Valores textuais (LIKE) positivos.
+    *   `$not`: Valores com negação.
+    *   `$notLike`: Valores textuais com negação.
+3.  **Aplica a Transformação (`format()`):** Executa o método `prepare()` da classe de tipo em cada um dos buckets para garantir que todos os valores passem pela transformação ou validação devida:
+    ```php
+    $this->and     = $this->type->prepare($this->and, $this->searchParser);
+    $this->andLike = $this->type->prepare($this->andLike, $this->searchParser);
+    $this->not     = $this->type->prepare($this->not, $this->searchParser);
+    $this->notLike = $this->type->prepare($this->notLike, $this->searchParser);
+    ```
+
+---
+
+#### Criando um Tipo Customizado
+
+Para campos complexos ou personalizados, você pode criar o seu próprio tradutor de tipo.
+
+##### Exemplo de Caso de Uso: Campo JSON
+Suponha que você tenha um cast customizado chamado `JsonColumn`. Quando o frontend filtrar por igualdade (`EQ`), você precisa aplicar `json_encode` no valor para buscar corretamente no banco. Porém, se for uma busca textual (`LIKE`), você quer o valor cru.
+
+##### 1. Criar a classe do tipo
+```php
+<?php
+
+namespace App\Types;
+
+use PowerVending\LaravelApiQueryBuilder\Types\AbstractType;
+use PowerVending\LaravelApiQueryBuilder\SearchParserInterface;
+
+class JsonColumnType extends AbstractType
+{
+    public static function name(): string
+    {
+        // Deve ser o FQCN (caminho completo) do seu cast no Model
+        return \App\Casts\JsonColumn::class;
+    }
+
+    public function prepare(array $values, ?SearchParserInterface $searchParser = null): array
+    {
+        $operator = $searchParser?->getOperator();
+
+        // Operadores de texto: mantém o valor cru para buscas parciais
+        if (in_array($operator, ['LIKE:', 'STARTS_WITH:', 'ENDS_WITH:'], true)) {
+            return $values;
+        }
+
+        // Operador de comparação exata (EQ): serializa o valor para JSON
+        return array_map(function ($value) {
+            return json_encode($value, JSON_THROW_ON_ERROR);
+        }, $values);
+    }
+}
+```
+
+##### 2. Registrar no config (`config/api-query-builder.php`)
+```php
+'types' => [
+    \PowerVending\LaravelApiQueryBuilder\Types\GenericType::class,
+    \PowerVending\LaravelApiQueryBuilder\Types\BooleanType::class,
+    \App\Types\JsonColumnType::class, // Registro do seu tipo customizado
+],
+```
+
+---
+
+### Operadores por cast (`cast_operators`)
+
+A chave `cast_operators` no arquivo `config/api-query-builder.php` permite restringir quais operadores de busca estão disponíveis para campos do Model, baseando-se no cast configurado para eles. Isso serve como uma camada extra de validação e segurança.
+
+#### Como funciona a resolução de chaves?
+Quando o pacote valida os operadores de um campo, ele resolve a chave configurada no `cast_operators` da seguinte forma:
+1.  **Busca Exata:** Procura pelo nome exato do tipo ou FQCN do cast (ex: `App\Casts\DynamicConfiguration::class`).
+2.  **Normalização:** Se não encontrar, ele normaliza o tipo para lowercase e remove sufixos de parênteses (ex: `varchar(191)` vira `varchar`).
+3.  **Sem restrição:** Se nenhuma chave corresponder, assume que o campo não possui restrição de operadores.
+
+#### Exemplo de Configuração Real (Projeto Engineering)
+No projeto **Engineering**, os campos com casts customizados `DynamicConfiguration` e `DynamicProperty` restringem os operadores permitidos no arquivo de configuração `config/api-query-builder.php`:
+
+```php
+use App\Casts\DynamicConfiguration;
+use App\Casts\DynamicProperty;
+use PowerVending\LaravelApiQueryBuilder\SearchCallbacks\{
+    Equals, Like, Between, LessThan, GreaterThan, StartsWith, EndsWith, NotEquals, NotBetween, LessThanOrEqual, GreaterThanOrEqual
+};
+
+return [
+    // ...
+    'cast_operators' => [
+        // Restrição para o cast de configurações dinâmicas
+        DynamicConfiguration::class => [
+            Equals::class,
+            Like::class,
+            Between::class,
+            LessThan::class,
+            GreaterThan::class,
+            StartsWith::class,
+            EndsWith::class,
+            NotEquals::class,
+            NotBetween::class,
+            LessThanOrEqual::class,
+            GreaterThanOrEqual::class,
+        ],
+        // Restrição para o cast de propriedades dinâmicas
+        DynamicProperty::class => [
+            Equals::class,
+            Like::class,
+            Between::class,
+            LessThan::class,
+            GreaterThan::class,
+            StartsWith::class,
+            EndsWith::class,
+            NotEquals::class,
+            NotBetween::class,
+            LessThanOrEqual::class,
+            GreaterThanOrEqual::class,
+        ],
+    ],
+];
+```
+
+#### Efeito no Schema e na Validação
+1.  **Schema da API:** A rota `/schema` do recurso só listará os operadores configurados para estes campos.
+2.  **Validação:** Se o frontend tentar rodar uma query não permitida (ex: `{"configuration": "JSON_SEARCH:$.key"}`), a API rejeitará e retornará a exceção `ApiQueryBuilderException` com a mensagem:
+    > `Operator 'JSON_SEARCH:' is not allowed for cast type 'App\Casts\DynamicConfiguration' on column 'configuration'.`
+
+---
+
+### Como `types` e `cast_operators` trabalham juntos
+
+Eles atuam em conjunto sobre o **mesmo tipo resolvido** do campo, mas em momentos e com responsabilidades bem definidas:
+
+1.  **Validação de Operador (`cast_operators`):**
+    O pacote intercepta a requisição e verifica se o operador enviado pelo frontend é aceito pelo cast do campo (ex: *"O operador `LIKE:` é permitido para o cast `DynamicConfiguration`?"*). Se sim, a requisição continua.
+2.  **Preparação e Formatação de Dados (`types`):**
+    O valor do filtro é enviado para a classe de tipo associada (ex: `DynamicConfigurationType`), que prepara a formatação do valor (ex: faz um `json_encode` para busca `EQ` ou mantém o valor cru para busca `LIKE`).
+3.  **Montagem da Query:**
+    Com o operador validado e os valores devidamente convertidos para o formato que o banco de dados espera, o pacote monta a query SQL.
+
+| Aspecto | `cast_operators` | `types` |
+| :--- | :--- | :--- |
+| **Responsabilidade** | Restringir quais operadores são permitidos | Transformar/validar o valor do filtro (`prepare()`) |
+| **Momento de Execução** | Na construção do parser da query e na rota `/schema` | Durante o mapeamento dos filtros em `CategorizedValues::format()` |
+| **Lookup de Classe** | Mapeamento no `cast_operators` do config | Mapeamento de `name()` no registry de `types` do config |
+| **Fallback** | Fluxo normal do tipo da coluna no banco (sem restrições) | Tipo fallback `GenericType` (sem transformações) |
+
 ---
 
 ## Erros retornados pela API
@@ -2468,6 +2907,68 @@ Se o objetivo é um intervalo, use `BT:` (between):
 
 ---
 
+### `Operator '<OP>' is not allowed for cast type '<TYPE>' on column '<COLUMN>'.`
+
+**Exceção:** `ApiQueryBuilderException`
+
+**Causa:** O campo pesquisado possui um cast definido no model (`$casts`) e o operador utilizado não está na lista de operadores permitidos para esse cast em `cast_operators` no arquivo `config/api-query-builder.php`.
+
+Este erro só ocorre quando a chave `cast_operators` está configurada com ao menos um mapeamento de cast.
+
+**Exemplo que causa o erro:**
+
+Model com cast:
+```php
+protected $casts = [
+    'is_active' => 'boolean',
+];
+```
+
+Config:
+```php
+'cast_operators' => [
+    'boolean' => [\PowerVending\LaravelApiQueryBuilder\SearchCallbacks\Equals::class],
+],
+```
+
+Requisição inválida:
+```json
+{"is_active": "GT:1"}
+```
+
+**Solução:**
+
+1. Use um dos operadores permitidos para o cast do campo (consulte a rota de schema para ver quais estão disponíveis).
+2. Se o operador for necessário, adicione-o à lista de `cast_operators` para o cast correspondente no arquivo de configuração.
+3. Se não quiser restrição para esse cast, remova a entrada de `cast_operators`.
+
+### `Wrong argument type provided`
+
+**Exceção:** `ApiQueryBuilderException`
+
+**Causa:** Um filtro foi aplicado em uma coluna com cast `boolean` (booleano), mas o valor enviado não pôde ser convertido para booleano.
+
+**Exemplo que causa o erro:**
+```json
+{"is_active": "EQ:talvez"}
+```
+
+**Solução:** Envie apenas valores booleanos aceitos (`true`, `false`, `1`, `0`, `yes`, `no`, `on`, `off`).
+
+---
+
+### `No valid callback for '<TYPE>' type.`
+
+**Exceção:** `ApiQueryBuilderException`
+
+**Causa:** O tipo identificado para a coluna no banco de dados ou no Model não possui uma classe de tratamento correspondente registrada em `types` (e o fallback geral `GenericType` não está configurado).
+
+**Solução:**
+1. Verifique se `GenericType::class` está registrado na chave `types` do arquivo de configuração `config/api-query-builder.php`. Ele funciona como o fallback padrão.
+2. Se o campo exige uma conversão customizada, crie e registre seu tipo customizado na configuração (veja [Criando e Registrando um Tipo Customizado](#criando-e-registrando-um-tipo-customizado)).
+
+---
+
 ## Solução de problemas
 
 ### Erro: "Column not found"
@@ -2522,7 +3023,7 @@ O pacote irá qualificar automaticamente as colunas.
 
 **Solução:**
 
-1. Verifique a propriedade `$forbiddenColumns` na model
+1. Verifique a propriedade `$apiQueryBuilderForbiddenColumns` na model
 2. Verifique `config/api-query-builder.php` → `global_forbidden_columns`
 3. Verifique `config/api-query-builder.php` → `model_options[YourModel::class]['forbidden_columns']`
 4. Remova a coluna da lista ou use outra coluna para buscar

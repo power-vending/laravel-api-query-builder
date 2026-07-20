@@ -85,6 +85,22 @@ return [
     ],
 
     /**
+     * Operators allowed per cast type.
+     * If defined for a cast, only those operators will be available for fields with that cast type.
+     * Cast names must match Laravel cast types (e.g. 'integer', 'boolean', 'string').
+     * If a cast type is not listed here, the normal operator resolution flow is used.
+     *
+     * Example:
+     *   'cast_operators' => [
+     *       'integer' => [Equals::class, NotEquals::class, LessThan::class, LessThanOrEqual::class, GreaterThan::class, GreaterThanOrEqual::class, Between::class, NotBetween::class],
+     *       'boolean' => [Equals::class],
+     *   ],
+     */
+    'cast_operators' => [
+        // 'integer' => [Equals::class, NotEquals::class, ...],
+    ],
+
+    /**
      * Registered types. Generic type is the default one and should be used if
      * no special care for type value is needed.
      */
@@ -100,6 +116,14 @@ return [
      */
     'global_forbidden_columns' => [
         // 'id', 'created_at' ...
+    ],
+
+    /**
+     * List of globally forbidden relations.
+     * Forbidden relations are treated as not found and are never auto-discovered.
+     */
+    'global_forbidden_relations' => [
+        // 'company.users', 'internalRelation' ...
     ],
 
     /**
@@ -144,6 +168,12 @@ return [
              * List of relations to load by default. These will be overridden if provided within query string.
              */
             'relations' => ['rel1', 'rel2'],
+
+            /**
+             * Relations that are forbidden for this model.
+             * Forbidden relations are treated as not found and are never auto-discovered.
+             */
+            'forbidden_relations' => ['internal_relation'],
 
             /**
              * TBD

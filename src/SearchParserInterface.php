@@ -4,4 +4,7 @@ declare(strict_types = 1);
 
 namespace PowerVending\LaravelApiQueryBuilder;
 
-interface SearchParserInterface {}
+interface SearchParserInterface
+{
+    public function getOperator(): string;
+}

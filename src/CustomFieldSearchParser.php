@@ -62,6 +62,16 @@ class CustomFieldSearchParser implements SearchParserInterface
         $this->type = $this->getColumnType();
     }
 
+    public function getOperator(): string
+    {
+        return $this->operator;
+    }
+
+    public function isModelRelation(): bool
+    {
+        return false;
+    }
+
     /**
      * @param  $operators
      * @param  string  $argument

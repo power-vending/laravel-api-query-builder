@@ -7,10 +7,10 @@ namespace PowerVending\LaravelApiQueryBuilder\Schema;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\{Config, Schema};
-use Illuminate\Support\Str;
 use PowerVending\LaravelApiQueryBuilder\CategorizedValues;
 use PowerVending\LaravelApiQueryBuilder\Config\{ModelConfig, OperatorsConfig};
 use PowerVending\LaravelApiQueryBuilder\Exceptions\InvalidRelationException;
+use PowerVending\LaravelApiQueryBuilder\Support\RelationMethodNormalizer;
 
 class QueryBuilderSchema
 {
@@ -119,23 +119,25 @@ class QueryBuilderSchema
      */
     private static function resolveSingleRelation(Model $model, string $segment): ?Model
     {
-        $method = Str::camel($segment);
+        $method = RelationMethodNormalizer::normalize($segment);
+        $globalForbiddenRelations = Config::get('api-query-builder.global_forbidden_relations', []);
+        $modelConfig = new ModelConfig($model);
 
-        if (!method_exists($model, $method)) {
+        if ($method === null || $modelConfig->isRelationForbidden($method, $globalForbiddenRelations) || !method_exists($model, $method)) {
             return null;
         }
 
         try {
             $relation = $model->{$method}();
-
-            if (!$relation instanceof Relation) {
-                return null;
-            }
-
-            return $relation->getRelated();
         } catch (\Throwable) {
             return null;
         }
+
+        if (!$relation instanceof Relation) {
+            return null;
+        }
+
+        return $relation->getRelated();
     }
 
     private static function getSearchableColumns(Model $model, ModelConfig $model_config): array
@@ -201,12 +203,43 @@ class QueryBuilderSchema
         return array_unique($forbidden);
     }
 
+    private static function resolveCastOperatorsKey(string $type, array $cast_operators): ?string
+    {
+        $raw = trim($type);
+
+        if (array_key_exists($raw, $cast_operators)) {
+            return $raw;
+        }
+
+        $normalized = strtolower($raw);
+        $normalized = preg_replace('/\(.*\)$/', '', $normalized) ?? $normalized;
+
+        if (array_key_exists($normalized, $cast_operators)) {
+            return $normalized;
+        }
+
+        return null;
+    }
+
     private static function getOperatorsForType(string $type): array
     {
-        $operators_config = new OperatorsConfig();
-
         $normalized_type = strtolower(trim($type));
         $normalized_type = preg_replace('/\(.*\)$/', '', $normalized_type) ?? $normalized_type;
+
+        $cast_operators = Config::get('api-query-builder.cast_operators', []);
+        $cast_key = self::resolveCastOperatorsKey($type, $cast_operators);
+
+        if ($cast_key !== null) {
+            $result = array_map(
+                fn ($class) => rtrim($class::operator(), ':'),
+                $cast_operators[$cast_key]
+            );
+            sort($result);
+
+            return $result;
+        }
+
+        $operators_config = new OperatorsConfig();
 
         $is_text = in_array($normalized_type, CategorizedValues::STRING_TYPES, true);
         $is_json = in_array($normalized_type, ['json', 'jsonb'], true);
@@ -224,6 +257,8 @@ class QueryBuilderSchema
                 $result[] = rtrim($callback_class::operator(), ':');
             }
         }
+
+        sort($result);
 
         return $result;
     }
