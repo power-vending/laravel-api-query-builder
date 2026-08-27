@@ -114,7 +114,7 @@ abstract class AbstractCallback
                 return;
             }
 
-            $this->execute($builder, $relatedColumns, $values);
+            $this->execute($builder, ColumnQualifier::qualify($builder, $relatedColumns), $values);
             $this->checkExecuteForCustomfieldsParameter($builder);
         });
     }

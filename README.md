@@ -1164,6 +1164,40 @@ Define a ordem dos resultados.
 - `asc` - ordem crescente (A-Z, 0-9, mais antigo para mais novo)
 - `desc` - ordem decrescente (Z-A, 9-0, mais novo para mais antigo)
 
+**Qualificação de colunas:**
+
+Toda coluna do `order_by` é prefixada com a tabela antes de ir para o SQL, evitando erros de
+coluna ambígua quando a query já tem `JOIN`s (por exemplo, um filtro por relacionamento seguido
+de uma ordenação):
+
+```json
+{"order_by": {"name": "asc"}}
+```
+
+```sql
+order by "products"."name" asc
+```
+
+Também é possível informar o prefixo manualmente. Se o prefixo for a tabela do model ou uma
+tabela já presente em algum `JOIN` da query, ele é respeitado e nenhum `JOIN` extra é criado:
+
+```json
+{"order_by": {"products.name": "asc"}}
+```
+
+Caso o prefixo não seja uma tabela conhecida da query, ele é interpretado como um relacionamento
+(veja [Ordenação por relacionamento](#ordenação-por-relacionamento)).
+
+Quando a mesma tabela precisa ser incluída mais de uma vez — relacionamentos auto-referenciados
+(`parent.name`) ou dois relacionamentos apontando para a mesma tabela (`created_by.name` e
+`updated_by.name`) — o pacote gera um alias (`authors`, `authors_2`, ...) para cada `JOIN`:
+
+```sql
+left join "authors" on "tickets"."created_by" = "authors"."id"
+left join "authors" as "authors_2" on "tickets"."updated_by" = "authors_2"."id"
+order by "authors"."name" asc, "authors_2"."name" desc
+```
+
 ### 4. limit e offset (Paginação manual)
 
 Controla quantos registros retornar e a partir de qual posição.
@@ -1727,6 +1761,16 @@ FROM products
 LEFT JOIN brands ON products.brand_id = brands.id
 ORDER BY brands.name DESC, products.created_at ASC
 ```
+
+#### Relacionamentos suportados
+
+| Relacionamento | Suportado | Observação |
+| --- | --- | --- |
+| `BelongsTo` | Sim | `LEFT JOIN` direto |
+| `HasOne` / `HasMany` | Sim | `HasMany` adiciona `GROUP BY` na PK do model |
+| `MorphOne` / `MorphMany` | Sim | O `JOIN` inclui a condição de `*_type` |
+| `BelongsToMany` / `MorphToMany` | Sim | `JOIN` na pivot e depois na tabela relacionada, com `GROUP BY` na PK do model. `MorphToMany` inclui a condição de `*_type` na pivot |
+| `MorphTo` | Não | Lança `ApiQueryBuilderException`: o relacionamento pode apontar para várias tabelas |
 
 ### Qualificação automática de colunas
 
