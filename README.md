@@ -1807,6 +1807,38 @@ Sem a qualificação automática, o SQL seria:
 SELECT id, name  -- ERRO: Column 'name' in SELECT is ambiguous
 ```
 
+#### Colunas em `where` escritos pela aplicação
+
+O `LEFT JOIN` adicionado pelo `order_by` também torna ambíguas as colunas cruas dos
+`where` que a **sua aplicação** escreve — antes ou depois de chamar `requestQuery()` /
+`requestPaginate()`:
+
+```php
+// Antes: quebrava com "ambiguous column name: id"
+Terminal::requestQuery($input)->whereNotIn('id', $ids)->get();
+Terminal::where('id', $id)->requestQuery($input)->first();
+```
+
+Todo model que usa a trait `ApiQueryBuilder` passa a usar um query builder que qualifica
+essas colunas sozinho, então **não é preciso escrever `->whereNotIn('terminals.id', ...)`
+manualmente**. Vale para `where`, `whereIn`, `whereNotIn`, `whereNull`, `whereNotNull` e
+para os mesmos métodos dentro de closures aninhados.
+
+A qualificação só acontece quando a coluna é **de fato ambígua**, ou seja, quando a query
+tem `JOIN` **e** a coluna existe tanto na tabela base quanto em alguma tabela joinada
+(verificado com `Schema::hasColumn`, com cache por conexão). Colunas que existem apenas na
+tabela base, apenas numa tabela joinada (o caso típico das FKs de uma pivot, como
+`configuration_id` em `companies_has_configurations`) ou já prefixadas ficam intocadas:
+
+```php
+// 'configuration_id' só existe na pivot: nunca foi ambíguo, continua cru
+$company->configurations()->whereIn('configuration_id', $ids)->get();
+```
+
+> **Nota:** a troca do query builder vale para todas as queries do model, não só as que
+> chamam `requestQuery()`/`requestPaginate()`. Como ela só age quando há `JOIN` e
+> ambiguidade real, é um no-op para as demais.
+
 ### Exemplo completo com relacionamento
 
 **JSON completo:**
