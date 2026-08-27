@@ -11,6 +11,7 @@ use Mockery;
 use PowerVending\LaravelApiQueryBuilder\Config\ModelConfig;
 use PowerVending\LaravelApiQueryBuilder\Exceptions\ApiQueryBuilderException;
 use PowerVending\LaravelApiQueryBuilder\RequestParameters\OrderByParameter;
+use PowerVending\LaravelApiQueryBuilder\Tests\Fixtures\{CategoryModel, TicketModel};
 use PowerVending\LaravelApiQueryBuilder\Tests\TestCase;
 
 class OrderByParameterTest extends TestCase
@@ -172,5 +173,118 @@ class OrderByParameterTest extends TestCase
             $builder,
             $modelConfig
         ))->run();
+    }
+
+    /** @test */
+    public function qualifies_simple_columns_with_the_model_table()
+    {
+        $model = new \PowerVending\LaravelApiQueryBuilder\Tests\TestModel();
+        $builder = $model->newQuery();
+
+        (new OrderByParameter(['name' => 'asc', 'created_at'], $builder, new ModelConfig($model)))->run();
+
+        $this->assertStringContainsString('order by "test"."name" asc, "test"."created_at" asc', $builder->toSql());
+    }
+
+    /** @test */
+    public function accepts_columns_already_prefixed_with_the_model_table()
+    {
+        $model = new \PowerVending\LaravelApiQueryBuilder\Tests\TestModel();
+        $builder = $model->newQuery();
+
+        (new OrderByParameter(['test.name' => 'asc'], $builder, new ModelConfig($model)))->run();
+
+        $sql = $builder->toSql();
+
+        $this->assertStringContainsString('order by "test"."name" asc', $sql);
+        $this->assertStringNotContainsString('left join', $sql);
+    }
+
+    /** @test */
+    public function accepts_columns_prefixed_with_a_table_already_joined_by_the_query()
+    {
+        $model = new \PowerVending\LaravelApiQueryBuilder\Tests\TestModel();
+        $builder = $model->newQuery()->leftJoin('related', 'related.id', '=', 'test.related_id');
+
+        (new OrderByParameter(['related.name' => 'asc'], $builder, new ModelConfig($model)))->run();
+
+        $sql = $builder->toSql();
+
+        $this->assertStringContainsString('order by "related"."name" asc', $sql);
+        $this->assertSame(1, substr_count($sql, 'left join'));
+    }
+
+    /** @test */
+    public function qualifies_columns_with_the_table_alias_when_the_query_uses_one()
+    {
+        $model = new \PowerVending\LaravelApiQueryBuilder\Tests\TestModel();
+        $builder = $model->newQuery()->from('test as t');
+
+        (new OrderByParameter(['name' => 'asc'], $builder, new ModelConfig($model)))->run();
+
+        $this->assertStringContainsString('order by "t"."name" asc', $builder->toSql());
+    }
+
+    /** @test */
+    public function aliases_the_joined_table_when_ordering_by_a_self_referencing_relation()
+    {
+        $model = new CategoryModel();
+        $builder = $model->newQuery();
+
+        (new OrderByParameter(['parent.name' => 'asc'], $builder, new ModelConfig($model)))->run();
+
+        $sql = $builder->toSql();
+
+        $this->assertStringContainsString('left join "categories" as "categories_2" on "categories"."parent_id" = "categories_2"."id"', $sql);
+        $this->assertStringContainsString('order by "categories_2"."name" asc', $sql);
+    }
+
+    /** @test */
+    public function aliases_the_second_join_when_two_relations_point_to_the_same_table()
+    {
+        $model = new TicketModel();
+        $builder = $model->newQuery();
+
+        (new OrderByParameter(
+            ['created_by.name' => 'asc', 'updated_by.name' => 'desc'],
+            $builder,
+            new ModelConfig($model)
+        ))->run();
+
+        $sql = $builder->toSql();
+
+        $this->assertStringContainsString('left join "authors" on "tickets"."created_by" = "authors"."id"', $sql);
+        $this->assertStringContainsString('left join "authors" as "authors_2" on "tickets"."updated_by" = "authors_2"."id"', $sql);
+        $this->assertStringContainsString('order by "authors"."name" asc, "authors_2"."name" desc', $sql);
+    }
+
+    /** @test */
+    public function orders_by_a_morph_many_relation_constraining_the_morph_type()
+    {
+        $model = new TicketModel();
+        $builder = $model->newQuery();
+
+        (new OrderByParameter(['comments.body' => 'asc'], $builder, new ModelConfig($model)))->run();
+
+        $sql = $builder->toSql();
+
+        $this->assertStringContainsString('left join "comments" on "comments"."commentable_id" = "tickets"."id" and "comments"."commentable_type" = ?', $sql);
+        $this->assertStringContainsString('group by "tickets"."id"', $sql);
+        $this->assertStringContainsString('order by "comments"."body" asc', $sql);
+    }
+
+    /** @test */
+    public function orders_by_a_belongs_to_many_relation_through_its_pivot()
+    {
+        $model = new TicketModel();
+        $builder = $model->newQuery();
+
+        (new OrderByParameter(['partners.name' => 'asc'], $builder, new ModelConfig($model)))->run();
+
+        $sql = $builder->toSql();
+
+        $this->assertStringContainsString('left join "partner_ticket" on "partner_ticket"."ticket_id" = "tickets"."id"', $sql);
+        $this->assertStringContainsString('left join "partners" on "partners"."id" = "partner_ticket"."partner_id"', $sql);
+        $this->assertStringContainsString('order by "partners"."name" asc', $sql);
     }
 }

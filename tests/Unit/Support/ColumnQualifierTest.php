@@ -55,4 +55,40 @@ class ColumnQualifierTest extends TestCase
             ColumnQualifier::qualifyForSelect('DATE(created_at) as created_date', 'test')
         );
     }
+
+    /** @test */
+    public function qualifies_with_the_query_alias_instead_of_the_model_table()
+    {
+        $builder = (new TestModel())->newQuery()->from('test as t');
+
+        $this->assertSame('t.created_at', ColumnQualifier::qualify($builder, 'created_at'));
+        $this->assertSame('t', ColumnQualifier::tableAlias($builder));
+    }
+
+    /** @test */
+    public function lists_the_from_and_every_joined_table()
+    {
+        $builder = (new TestModel())->newQuery()
+            ->leftJoin('related', 'related.id', '=', 'test.related_id')
+            ->leftJoin('nested as n', 'n.id', '=', 'related.nested_id');
+
+        $this->assertSame(['test', 'related', 'n'], ColumnQualifier::knownTableAliases($builder));
+    }
+
+    /** @test */
+    public function detects_columns_prefixed_with_a_table_reachable_by_the_query()
+    {
+        $builder = (new TestModel())->newQuery()->leftJoin('related', 'related.id', '=', 'test.related_id');
+
+        $this->assertTrue(ColumnQualifier::isQualifiedWithKnownTable($builder, 'test.name'));
+        $this->assertTrue(ColumnQualifier::isQualifiedWithKnownTable($builder, 'related.name'));
+        $this->assertFalse(ColumnQualifier::isQualifiedWithKnownTable($builder, 'company.name'));
+        $this->assertFalse(ColumnQualifier::isQualifiedWithKnownTable($builder, 'name'));
+    }
+
+    /** @test */
+    public function returns_table_alias_as_null_when_builder_has_no_model_and_no_from()
+    {
+        $this->assertNull(ColumnQualifier::tableAlias(app(Builder::class)));
+    }
 }

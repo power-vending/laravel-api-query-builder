@@ -3,11 +3,29 @@
 namespace PowerVending\LaravelApiQueryBuilder\Traits;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use PowerVending\LaravelApiQueryBuilder\ApiQuery;
+use PowerVending\LaravelApiQueryBuilder\Support\QualifyingQueryBuilder;
 
 trait ApiQueryBuilder
 {
+    /**
+     * Swap the query builder for one that auto-qualifies bare where columns when
+     * there are joins, so callers never have to prefix columns by hand after
+     * requestQuery()/requestPaginate() joins a relation for order_by/filter.
+     */
+    protected function newBaseQueryBuilder(): QueryBuilder
+    {
+        $connection = $this->getConnection();
+
+        return new QualifyingQueryBuilder(
+            $connection,
+            $connection->getQueryGrammar(),
+            $connection->getPostProcessor()
+        );
+    }
+
     /**
      * Scope a query from request parameters.
      *
