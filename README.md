@@ -1164,6 +1164,40 @@ Define a ordem dos resultados.
 - `asc` - ordem crescente (A-Z, 0-9, mais antigo para mais novo)
 - `desc` - ordem decrescente (Z-A, 9-0, mais novo para mais antigo)
 
+**Qualificação de colunas:**
+
+Toda coluna do `order_by` é prefixada com a tabela antes de ir para o SQL, evitando erros de
+coluna ambígua quando a query já tem `JOIN`s (por exemplo, um filtro por relacionamento seguido
+de uma ordenação):
+
+```json
+{"order_by": {"name": "asc"}}
+```
+
+```sql
+order by "products"."name" asc
+```
+
+Também é possível informar o prefixo manualmente. Se o prefixo for a tabela do model ou uma
+tabela já presente em algum `JOIN` da query, ele é respeitado e nenhum `JOIN` extra é criado:
+
+```json
+{"order_by": {"products.name": "asc"}}
+```
+
+Caso o prefixo não seja uma tabela conhecida da query, ele é interpretado como um relacionamento
+(veja [Ordenação por relacionamento](#ordenação-por-relacionamento)).
+
+Quando a mesma tabela precisa ser incluída mais de uma vez — relacionamentos auto-referenciados
+(`parent.name`) ou dois relacionamentos apontando para a mesma tabela (`created_by.name` e
+`updated_by.name`) — o pacote gera um alias (`authors`, `authors_2`, ...) para cada `JOIN`:
+
+```sql
+left join "authors" on "tickets"."created_by" = "authors"."id"
+left join "authors" as "authors_2" on "tickets"."updated_by" = "authors_2"."id"
+order by "authors"."name" asc, "authors_2"."name" desc
+```
+
 ### 4. limit e offset (Paginação manual)
 
 Controla quantos registros retornar e a partir de qual posição.
@@ -1728,6 +1762,16 @@ LEFT JOIN brands ON products.brand_id = brands.id
 ORDER BY brands.name DESC, products.created_at ASC
 ```
 
+#### Relacionamentos suportados
+
+| Relacionamento | Suportado | Observação |
+| --- | --- | --- |
+| `BelongsTo` | Sim | `LEFT JOIN` direto |
+| `HasOne` / `HasMany` | Sim | `HasMany` adiciona `GROUP BY` na PK do model |
+| `MorphOne` / `MorphMany` | Sim | O `JOIN` inclui a condição de `*_type` |
+| `BelongsToMany` / `MorphToMany` | Sim | `JOIN` na pivot e depois na tabela relacionada, com `GROUP BY` na PK do model. `MorphToMany` inclui a condição de `*_type` na pivot |
+| `MorphTo` | Não | Lança `ApiQueryBuilderException`: o relacionamento pode apontar para várias tabelas |
+
 ### Qualificação automática de colunas
 
 Quando você usa ordenação por relacionamento, pode ocorrer ambiguidade se ambas as tabelas tiverem colunas com o mesmo nome (ex: `id`, `name`, `created_at`).
@@ -1762,6 +1806,38 @@ Sem a qualificação automática, o SQL seria:
 ```sql
 SELECT id, name  -- ERRO: Column 'name' in SELECT is ambiguous
 ```
+
+#### Colunas em `where` escritos pela aplicação
+
+O `LEFT JOIN` adicionado pelo `order_by` também torna ambíguas as colunas cruas dos
+`where` que a **sua aplicação** escreve — antes ou depois de chamar `requestQuery()` /
+`requestPaginate()`:
+
+```php
+// Antes: quebrava com "ambiguous column name: id"
+Terminal::requestQuery($input)->whereNotIn('id', $ids)->get();
+Terminal::where('id', $id)->requestQuery($input)->first();
+```
+
+Todo model que usa a trait `ApiQueryBuilder` passa a usar um query builder que qualifica
+essas colunas sozinho, então **não é preciso escrever `->whereNotIn('terminals.id', ...)`
+manualmente**. Vale para `where`, `whereIn`, `whereNotIn`, `whereNull`, `whereNotNull` e
+para os mesmos métodos dentro de closures aninhados.
+
+A qualificação só acontece quando a coluna é **de fato ambígua**, ou seja, quando a query
+tem `JOIN` **e** a coluna existe tanto na tabela base quanto em alguma tabela joinada
+(verificado com `Schema::hasColumn`, com cache por conexão). Colunas que existem apenas na
+tabela base, apenas numa tabela joinada (o caso típico das FKs de uma pivot, como
+`configuration_id` em `companies_has_configurations`) ou já prefixadas ficam intocadas:
+
+```php
+// 'configuration_id' só existe na pivot: nunca foi ambíguo, continua cru
+$company->configurations()->whereIn('configuration_id', $ids)->get();
+```
+
+> **Nota:** a troca do query builder vale para todas as queries do model, não só as que
+> chamam `requestQuery()`/`requestPaginate()`. Como ela só age quando há `JOIN` e
+> ambiguidade real, é um no-op para as demais.
 
 ### Exemplo completo com relacionamento
 
